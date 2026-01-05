@@ -1,0 +1,70 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Syclar - Overcome Social Anxiety</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              gold: {
+                DEFAULT: '#D4AF37',
+                light: '#F4CF67',
+                dark: '#A68926',
+              },
+              dark: {
+                DEFAULT: '#0A0A0A',
+                card: '#141414',
+                accent: '#1F1F1F',
+              }
+            },
+            animation: {
+              'spin-slow': 'spin 8s linear infinite',
+              'pulse-slow': 'pulse-custom 4s ease-in-out infinite',
+            },
+            keyframes: {
+              'pulse-custom': {
+                '0%, 100%': { boxShadow: '0 0 10px rgba(212, 175, 55, 0.1)' },
+                '50%': { boxShadow: '0 0 30px rgba(212, 175, 55, 0.4)' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body { font-family: 'Inter', sans-serif; background-color: #000000; color: #FFFFFF; }
+      .bg-gradient-gold {
+        background: linear-gradient(135deg, #141414 0%, #000000 100%);
+      }
+      .glass-card {
+        background: rgba(20, 20, 20, 0.8);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(212, 175, 55, 0.2);
+      }
+      .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background: #D4AF37; border-radius: 10px; }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
+  }
+}
+</script>
+</head>
+  <body class="bg-gradient-gold min-h-screen">
+    <div id="root"></div>
+  </body>
+</html>

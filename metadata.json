@@ -1,0 +1,8 @@
+{
+  "name": "Copy of Syclar: Morning Confidence Coach",
+  "description": "A daily social conditioning app designed to help you overcome morning approach anxiety through AI-powered roleplay, progressive social quests, and instant anxiety relief tools.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}
