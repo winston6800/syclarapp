@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Layout from './components/Layout';
 import { AppScreen, Achievement, UserState, Difficulty, UserStats, Location } from './types';
 import { verifyApproachScreenshot } from './services/geminiService';
-import { Trophy, Zap, AlertCircle, CheckCircle2, Play, RefreshCw, X, Flame, Calendar, Award, MapPin, Clock, ShieldCheck, Target, Camera, Loader2, UserCheck, Map as MapIcon, Home as HomeIcon, Settings, Terminal, Plus, Minus, UserMinus, Crosshair, Navigation, LocateFixed, Eye, EyeOff, CheckCircle, Trash2, FastForward, Dice5, Coffee, ZapOff, ChevronRight, ChevronDown, ChevronLeft, Briefcase, History, BarChart3, Check, Quote, Star, Filter } from 'lucide-react';
+import { useUserData } from './hooks/useUserData';
+import { Trophy, Zap, AlertCircle, CheckCircle2, Play, RefreshCw, X, Flame, Calendar, Award, MapPin, Clock, ShieldCheck, Target, Camera, Loader2, UserCheck, Map as MapIcon, Home as HomeIcon, Settings, Terminal, Plus, Minus, UserMinus, Crosshair, Navigation, Eye, EyeOff, CheckCircle, Trash2, FastForward, Dice5, Coffee, ZapOff, ChevronRight, ChevronDown, ChevronLeft, Briefcase, History, BarChart3, Check, Quote, Star, Filter } from 'lucide-react';
 
 /**
  * Utility to calculate the current streak based on activity dates.
@@ -88,50 +89,8 @@ const App: React.FC = () => {
   const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
   const [devMenuOpen, setDevMenuOpen] = useState(false);
   
-  const [userState, setUserState] = useState<UserState>(() => {
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    const saved = localStorage.getItem('syclar_user_state_v12');
-    if (saved) return JSON.parse(saved);
-    
-    return {
-      confidenceLevel: 45,
-      streak: 0,
-      minThreshold: 1,
-      history: [
-        { date: 'Mon', confidence: 25 },
-        { date: 'Tue', confidence: 35 },
-        { date: 'Wed', confidence: 42 },
-        { date: 'Thu', confidence: 45 },
-      ],
-      approachDates: [yesterday],
-      dailyPasses: { [yesterday]: 5 },
-      dailyApproaches: { [yesterday]: 3 },
-      dailyBusinessFocus: { [yesterday]: false },
-      stats: {
-        avgDuration: 1.4,
-        rejectionResilience: 8,
-        uniqueLocations: 3,
-        morningInteractions: 4,
-        totalApproaches: 22,
-        totalPassedBy: 84
-      },
-      achievements: [
-        { id: 'streak-3', title: 'Momentum', description: 'Maintain a 3-day activity streak', icon: '⚡', unlocked: false, progress: 0, target: 3, category: 'CONSISTENCY' },
-        { id: 'streak-7', title: 'The Discipline', description: 'Maintain a 7-day activity streak', icon: '🔥', unlocked: false, progress: 0, target: 7, category: 'CONSISTENCY' },
-        { id: 'streak-14', title: 'The Professional', description: 'Maintain a 14-day activity streak', icon: '🛡️', unlocked: false, progress: 0, target: 14, category: 'CONSISTENCY' },
-        { id: 'streak-30', title: 'Total Transformation', description: 'Maintain a 30-day activity streak', icon: '💎', unlocked: false, progress: 0, target: 30, category: 'CONSISTENCY' },
-        { id: 'vol-100', title: 'Centurion', description: 'Log 100 total field interactions', icon: '📈', unlocked: false, progress: 22, target: 100, category: 'STAMINA' },
-        { id: 'morning-20', title: 'Morning Warrior', description: 'Log 20 morning approaches (Before 10AM)', icon: '☀️', unlocked: false, progress: 4, target: 20, category: 'CONSISTENCY' },
-      ],
-      homeLocation: null,
-      currentPassedBy: 0,
-      isOnBreak: false
-    };
-  });
-
-  useEffect(() => {
-    localStorage.setItem('syclar_user_state_v12', JSON.stringify(userState));
-  }, [userState]);
+  // Use the new hook for Supabase sync
+  const { userState, setUserState, loading: dataLoading } = useUserData();
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -330,7 +289,6 @@ const App: React.FC = () => {
             onVerifySuccess={handleVerifySuccess}
             onUpdatePassedBy={updatePassedBy}
             onToggleBreak={toggleBreakMode}
-            onSetHome={setHomeLocation}
             onUpdateThreshold={updateMinThreshold}
           />
         )}
@@ -418,9 +376,8 @@ const BaseHub: React.FC<{
   onVerifySuccess: (isRejection?: boolean) => void,
   onUpdatePassedBy: (delta: number) => void,
   onToggleBreak: (active: boolean) => void,
-  onSetHome: () => void,
   onUpdateThreshold: () => void
-}> = ({ userState, isDayCompleted, onVerifySuccess, onUpdatePassedBy, onToggleBreak, onSetHome, onUpdateThreshold }) => {
+}> = ({ userState, isDayCompleted, onVerifySuccess, onUpdatePassedBy, onToggleBreak, onUpdateThreshold }) => {
   const [verifying, setVerifying] = useState(false);
   const [lastVerifiedName, setLastVerifiedName] = useState<string | null>(null);
   const [showHonorCodeConfirm, setShowHonorCodeConfirm] = useState(false);
@@ -596,26 +553,6 @@ const BaseHub: React.FC<{
           </div>
         </div>
 
-        {/* Scrolling Rating Selector */}
-        <div className="space-y-3">
-          <p className="text-[9px] font-black uppercase text-gray-500 tracking-[0.2em] text-left">Set Target Rating Intensity</p>
-          <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar pb-2 mask-fade-edges">
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-              <button
-                key={num}
-                onClick={() => setSelectedRating(num)}
-                className={`flex-shrink-0 w-11 h-11 rounded-xl font-black transition-all flex items-center justify-center border ${
-                  selectedRating === num 
-                    ? 'bg-gold text-black border-gold scale-110 shadow-[0_0_15px_rgba(212,175,55,0.4)]' 
-                    : 'bg-white/5 text-white/40 border-white/10 hover:border-gold/30 hover:text-white'
-                }`}
-              >
-                {num}
-              </button>
-            ))}
-          </div>
-        </div>
-
         <div className="flex flex-col space-y-3 pt-2">
           <button className={`w-full py-4 rounded-xl font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-2 ${verifying ? 'bg-black text-gold border-2 border-gold' : 'bg-gold text-black shadow-lg'}`} onClick={() => !verifying && fileInputRef.current?.click()} disabled={verifying || userState.isOnBreak}>
             {verifying ? <Loader2 size={20} className="animate-spin" /> : <Camera size={20} />}<span>{verifying ? 'Verifying Contact...' : 'Log Success'}</span>
@@ -641,10 +578,6 @@ const BaseHub: React.FC<{
           </div>
         </button>
       </div>
-
-      <button onClick={onSetHome} className="w-full py-4 bg-white/5 text-gray-400 text-[10px] font-black uppercase tracking-widest rounded-2xl flex items-center justify-center space-x-3 active:scale-[0.97] border border-white/5">
-        <LocateFixed size={14} /><span>Update Home Anchor</span>
-      </button>
     </div>
   );
 };
