@@ -48,12 +48,20 @@ const Subscribe: React.FC = () => {
 
       // Call your Supabase Edge Function to create Stripe checkout session
       console.log('💳 Calling Edge Function...');
-      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+      
+      // Add timeout to detect hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Edge Function timeout after 30s')), 30000);
+      });
+      
+      const invokePromise = supabase.functions.invoke('create-checkout-session', {
         body: requestBody,
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
       });
+      
+      const { data, error } = await Promise.race([invokePromise, timeoutPromise]) as any;
 
       console.log('💳 Edge Function response:', { data, error });
 
