@@ -17,11 +17,12 @@ const Login: React.FC = () => {
 
   // Redirect when user becomes authenticated
   React.useEffect(() => {
-    if (user && !loading) {
+    if (user) {
       console.log('✅ User authenticated, redirecting to:', from);
+      setLoading(false);  // Reset loading state
       navigate(from, { replace: true });
     }
-  }, [user, loading, navigate, from]);
+  }, [user, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +34,10 @@ const Login: React.FC = () => {
     if (signInError) {
       setError(signInError.message);
       setLoading(false);
+    } else {
+      // Success - loading will be reset by useEffect when user is set
+      console.log('✅ Sign in successful, waiting for redirect...');
     }
-    // If successful, the useEffect will handle navigation when auth state updates
   };
 
   return (
