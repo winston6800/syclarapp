@@ -11,7 +11,7 @@ import {
 const Subscribe: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { user, signOut, profile, isTrialing, trialDaysRemaining } = useAuth();
+  const { user, session, signOut, profile, isTrialing, trialDaysRemaining } = useAuth();
   const navigate = useNavigate();
 
   const handleStartTrial = async () => {
@@ -26,12 +26,13 @@ const Subscribe: React.FC = () => {
       console.log('💳 Email:', user.email);
       console.log('💳 Price ID:', import.meta.env.VITE_STRIPE_PRICE_ID);
       
-      // Get the session token
-      const { data: { session } } = await supabase.auth.getSession();
+      // Use session from context instead of calling getSession()
+      console.log('💳 Checking session from context...');
       if (!session) {
-        throw new Error('Not authenticated');
+        throw new Error('Not authenticated - no session in context');
       }
       
+      console.log('💳 Session valid!');
       console.log('💳 Session token (first 20 chars):', session.access_token.substring(0, 20));
 
       const requestBody = { 
