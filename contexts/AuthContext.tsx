@@ -34,17 +34,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    console.log('📊 Fetching profile for user:', userId);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    if (error) {
-      console.error('Error fetching profile:', error);
+      if (error) {
+        console.error('📊 Error fetching profile:', error);
+        return null;
+      }
+      console.log('📊 Profile fetched:', data);
+      return data as UserProfile;
+    } catch (err) {
+      console.error('📊 Exception fetching profile:', err);
       return null;
     }
-    return data as UserProfile;
   };
 
   const refreshProfile = async () => {
@@ -72,16 +79,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        console.log('🔄 Auth state changed:', event, session ? 'Session exists' : 'No session');
         setSession(session);
         setUser(session?.user ?? null);
+        setLoading(false);  // Set loading to false immediately
+        
+        // Fetch profile in background (don't block)
         if (session?.user) {
-          const profileData = await fetchProfile(session.user.id);
-          setProfile(profileData);
+          fetchProfile(session.user.id).then(setProfile).catch(err => {
+            console.error('Failed to fetch profile:', err);
+            setProfile(null);
+          });
         } else {
           setProfile(null);
         }
-        setLoading(false);
       }
     );
 

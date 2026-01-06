@@ -9,11 +9,19 @@ const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const { signIn } = useAuth();
+  const { signIn, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
   const from = (location.state as any)?.from?.pathname || '/app';
+
+  // Redirect when user becomes authenticated
+  React.useEffect(() => {
+    if (user && !loading) {
+      console.log('✅ User authenticated, redirecting to:', from);
+      navigate(from, { replace: true });
+    }
+  }, [user, loading, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,13 +30,11 @@ const Login: React.FC = () => {
 
     const { error: signInError } = await signIn(email, password);
     
-    setLoading(false);  // Always reset loading state
-    
     if (signInError) {
       setError(signInError.message);
-    } else {
-      navigate(from, { replace: true });
+      setLoading(false);
     }
+    // If successful, the useEffect will handle navigation when auth state updates
   };
 
   return (
