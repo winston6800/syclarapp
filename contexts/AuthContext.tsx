@@ -144,6 +144,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     profile?.subscription_status === 'trialing';
 
   const isTrialing = profile?.subscription_status === 'trialing';
+  
+  // Debug logging
+  console.log('🔐 Subscription check:', {
+    profile_subscription_status: profile?.subscription_status,
+    hasActiveSubscription,
+    isTrialing,
+    profile_exists: !!profile,
+  });
 
   const trialDaysRemaining = profile?.trial_ends_at
     ? Math.max(0, Math.ceil((new Date(profile.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
