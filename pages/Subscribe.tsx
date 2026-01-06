@@ -46,22 +46,40 @@ const Subscribe: React.FC = () => {
       
       console.log('💳 Request body:', requestBody);
 
-      // Call your Supabase Edge Function to create Stripe checkout session
-      console.log('💳 Calling Edge Function...');
+      // Call Supabase Edge Function directly via fetch (bypassing SDK issues)
+      console.log('💳 Calling Edge Function via fetch...');
       
-      // Add timeout to detect hanging
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Edge Function timeout after 30s')), 30000);
-      });
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/create-checkout-session`;
       
-      const invokePromise = supabase.functions.invoke('create-checkout-session', {
-        body: requestBody,
+      console.log('💳 Edge Function URL:', edgeFunctionUrl);
+      
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
+        body: JSON.stringify(requestBody),
       });
       
-      const { data, error } = await Promise.race([invokePromise, timeoutPromise]) as any;
+      console.log('💳 Response status:', response.status);
+      
+      const responseText = await response.text();
+      console.log('💳 Response text:', responseText);
+      
+      let data;
+      let error;
+      
+      try {
+        data = JSON.parse(responseText);
+        if (!response.ok) {
+          error = { message: data.error || `HTTP ${response.status}` };
+        }
+      } catch (e) {
+        error = { message: `Failed to parse response: ${responseText}` };
+      }
 
       console.log('💳 Edge Function response:', { data, error });
 
