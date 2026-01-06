@@ -56,12 +56,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Get initial session
+    console.log('🔄 Initializing auth...');
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('🔄 Initial session:', session ? 'Found' : 'None');
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id).then(setProfile);
       }
+      setLoading(false);
+    }).catch(err => {
+      console.error('🔄 Auth initialization error:', err);
       setLoading(false);
     });
 
@@ -95,11 +100,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error: error as Error | null };
+    console.log('🔐 Attempting sign in for:', email);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      console.log('🔐 Sign in result:', { data, error });
+      return { error: error as Error | null };
+    } catch (err) {
+      console.error('🔐 Sign in exception:', err);
+      return { error: err as Error };
+    }
   };
 
   const signOut = async () => {
