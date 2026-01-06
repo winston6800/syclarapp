@@ -21,33 +21,61 @@ const Subscribe: React.FC = () => {
     setError('');
 
     try {
+      console.log('💳 Starting checkout process...');
+      console.log('💳 User ID:', user.id);
+      console.log('💳 Email:', user.email);
+      console.log('💳 Price ID:', import.meta.env.VITE_STRIPE_PRICE_ID);
+      
       // Get the session token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('Not authenticated');
       }
+      
+      console.log('💳 Session token (first 20 chars):', session.access_token.substring(0, 20));
+
+      const requestBody = { 
+        userId: user.id,
+        email: user.email,
+        priceId: import.meta.env.VITE_STRIPE_PRICE_ID,
+        trialDays: TRIAL_DAYS,
+        successUrl: `${window.location.origin}/app`,
+        cancelUrl: `${window.location.origin}/subscribe`,
+      };
+      
+      console.log('💳 Request body:', requestBody);
 
       // Call your Supabase Edge Function to create Stripe checkout session
+      console.log('💳 Calling Edge Function...');
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-        body: { 
-          userId: user.id,
-          email: user.email,
-          priceId: import.meta.env.VITE_STRIPE_PRICE_ID,
-          trialDays: TRIAL_DAYS,
-          successUrl: `${window.location.origin}/app`,
-          cancelUrl: `${window.location.origin}/subscribe`,
-        },
+        body: requestBody,
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
       });
 
-      if (error) throw error;
+      console.log('💳 Edge Function response:', { data, error });
+
+      if (error) {
+        console.error('💳 Edge Function error:', error);
+        throw error;
+      }
 
       if (data?.url) {
+        console.log('💳 Redirecting to Stripe:', data.url);
         window.location.href = data.url;
+      } else {
+        console.error('💳 No checkout URL returned:', data);
+        throw new Error('No checkout URL returned from server');
       }
     } catch (err: any) {
+      console.error('💳 Checkout failed:', err);
+      console.error('💳 Error details:', {
+        message: err.message,
+        name: err.name,
+        stack: err.stack,
+        full: err
+      });
       setError(err.message || 'Failed to start checkout');
       setLoading(false);
     }
@@ -84,9 +112,15 @@ const Subscribe: React.FC = () => {
           </p>
 
           {error && (
-            <div className="flex items-center space-x-2 p-4 bg-red-500/10 border border-red-500/20 rounded-xl mb-6">
-              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-              <p className="text-red-400 text-sm">{error}</p>
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl mb-6">
+              <div className="flex items-center space-x-2 mb-2">
+                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                <p className="text-red-400 text-sm font-bold">Error Starting Trial</p>
+              </div>
+              <p className="text-red-400 text-xs mb-2">{error}</p>
+              <p className="text-red-300/50 text-xs">
+                Check the browser console (F12) for detailed error logs starting with 💳
+              </p>
             </div>
           )}
 
