@@ -22,9 +22,10 @@ const Login: React.FC = () => {
 
     const { error: signInError } = await signIn(email, password);
     
+    setLoading(false);  // Always reset loading state
+    
     if (signInError) {
       setError(signInError.message);
-      setLoading(false);
     } else {
       navigate(from, { replace: true });
     }

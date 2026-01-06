@@ -32,9 +32,10 @@ const Signup: React.FC = () => {
 
     const { error: signUpError } = await signUp(email, password);
     
+    setLoading(false);  // Always reset loading state
+    
     if (signUpError) {
       setError(signUpError.message);
-      setLoading(false);
     } else {
       setSuccess(true);
     }
