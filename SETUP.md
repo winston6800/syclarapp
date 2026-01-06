@@ -168,9 +168,10 @@ serve(async (req) => {
     }
 
     // Verify the JWT token
+    // IMPORTANT: Use SUPABASE_ANON_KEY (reserved secret) for JWT verification
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',  // Reserved secret - automatically provided
       {
         global: {
           headers: { Authorization: authHeader },
