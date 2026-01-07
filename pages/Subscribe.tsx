@@ -110,7 +110,7 @@ const Subscribe: React.FC = () => {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/');
+    navigate('/login');
   };
 
   // If user already has trial/subscription that's valid, redirect to app

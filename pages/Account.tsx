@@ -51,7 +51,7 @@ const Account: React.FC = () => {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/');
+    navigate('/login');
   };
 
   const formatDate = (dateString: string | null) => {

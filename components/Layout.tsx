@@ -38,7 +38,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeScreen, onNavigate }) =
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/');
+    navigate('/login');
     setMenuOpen(false);
   };
 
