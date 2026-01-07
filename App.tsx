@@ -266,6 +266,8 @@ const App: React.FC = () => {
     updatePassedByRef.current = true;
     
     const today = new Date().toLocaleDateString('en-CA');
+    console.log(`📝 Updating passed by: ${delta > 0 ? '+' : ''}${delta} for ${today}`);
+    
     setUserState(prev => {
       if (prev.isOnBreak && delta > 0) {
         updatePassedByRef.current = false;
@@ -281,6 +283,8 @@ const App: React.FC = () => {
       const newStats = { ...prev.stats };
       if (delta > 0) newStats.totalPassedBy += delta;
       else if (delta < 0) newStats.totalPassedBy = Math.max(0, newStats.totalPassedBy + delta);
+      
+      console.log(`📝 New state:`, { currentPassedBy: newCurrent, todayPasses: newDailyPasses[today] });
       
       return { ...prev, currentPassedBy: newCurrent, dailyPasses: newDailyPasses, stats: newStats };
     });

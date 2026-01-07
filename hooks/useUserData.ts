@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { UserState } from '../types';
@@ -47,7 +47,6 @@ export const useUserData = () => {
   const [userState, setUserState] = useState<UserState | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load data from Supabase or localStorage
   useEffect(() => {
@@ -92,22 +91,11 @@ export const useUserData = () => {
     loadData();
   }, [user, hasActiveSubscription]);
 
-  // Save data to both localStorage and Supabase (without updating state)
+  // Save data to both localStorage and Supabase
   const saveUserState = useCallback(async (newState: UserState) => {
-    console.log('💾 Saving user state:', { 
-      currentPassedBy: newState.currentPassedBy,
-      todayPasses: newState.dailyPasses[new Date().toLocaleDateString('en-CA')],
-      hasUser: !!user,
-      hasSubscription: hasActiveSubscription 
-    });
-    
     // Always save to localStorage as backup
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
-      console.log('✅ Saved to localStorage');
-    } catch (error) {
-      console.error('❌ Failed to save to localStorage:', error);
-    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+    console.log('💾 Saved to localStorage:', { dailyPasses: newState.dailyPasses, currentPassedBy: newState.currentPassedBy });
 
     // Sync to Supabase if authenticated
     if (user && hasActiveSubscription) {
@@ -122,7 +110,7 @@ export const useUserData = () => {
         if (error) {
           console.error('❌ Failed to sync to Supabase:', error);
         } else {
-          console.log('✅ Synced to Supabase');
+          console.log('✅ Synced to Supabase successfully');
         }
       } catch (error) {
         console.error('❌ Failed to sync to Supabase:', error);
@@ -131,63 +119,22 @@ export const useUserData = () => {
     }
   }, [user, hasActiveSubscription]);
 
-  // Auto-save whenever userState changes (debounced - 2 seconds)
-  useEffect(() => {
-    if (userState && !loading) {
-      // Clear previous timeout
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-      
-      // Debounce saves by 2 seconds (only saves after user stops interacting)
-      saveTimeoutRef.current = setTimeout(() => {
-        console.log('⏰ Auto-saving state...');
-        saveUserState(userState);
-      }, 2000);
-    }
-    
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [userState, loading, saveUserState]);
-
-  // Save on page unload/navigation (ensures no data loss)
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (userState && !loading) {
-        // Clear timeout and save immediately to localStorage
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-        }
-        // Synchronous save to localStorage (always completes)
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(userState));
-        console.log('💾 Emergency save on page unload');
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('pagehide', handleBeforeUnload); // For mobile Safari
-    
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('pagehide', handleBeforeUnload);
-    };
-  }, [userState, loading]);
-
   // Update function that accepts a callback or new state
   const updateUserState = useCallback((
     updater: UserState | ((prev: UserState) => UserState)
   ) => {
     setUserState(prev => {
+      const currentState = prev || getDefaultState();
       const newState = typeof updater === 'function' 
-        ? updater(prev || getDefaultState()) 
+        ? updater(currentState) 
         : updater;
+      
+      // Save in background (don't await to keep UI responsive)
+      saveUserState(newState);
       
       return newState;
     });
-  }, []);
+  }, [saveUserState]);
 
   return {
     userState: userState || getDefaultState(),
