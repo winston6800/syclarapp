@@ -70,11 +70,14 @@ export const useUserData = () => {
             const parsed = JSON.parse(localData);
             setUserState(parsed);
             // Migrate to Supabase
-            await supabase.from('user_data').upsert({
-              user_id: user.id,
-              data: parsed,
-              updated_at: new Date().toISOString(),
-            });
+            await supabase.from('user_data').upsert(
+              {
+                user_id: user.id,
+                data: parsed,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'user_id', ignoreDuplicates: false }
+            );
           } else {
             setUserState(getDefaultState());
           }
@@ -101,11 +104,17 @@ export const useUserData = () => {
     if (user && hasActiveSubscription) {
       setSyncing(true);
       try {
-        const { error } = await supabase.from('user_data').upsert({
-          user_id: user.id,
-          data: newState,
-          updated_at: new Date().toISOString(),
-        });
+        const { error } = await supabase.from('user_data').upsert(
+          {
+            user_id: user.id,
+            data: newState,
+            updated_at: new Date().toISOString(),
+          },
+          { 
+            onConflict: 'user_id',  // Tell Supabase to update if user_id already exists
+            ignoreDuplicates: false  // We want to update, not ignore
+          }
+        );
         
         if (error) {
           console.error('❌ Failed to sync to Supabase:', error);
