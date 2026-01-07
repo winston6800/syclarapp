@@ -88,6 +88,7 @@ const App: React.FC = () => {
   const [screen, setScreen] = useState<AppScreen>(AppScreen.BASE);
   const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
   const [devMenuOpen, setDevMenuOpen] = useState(false);
+  const updatePassedByRef = useRef<boolean>(false);
   
   // Use the new hook for Supabase sync
   const { userState, setUserState, loading: dataLoading } = useUserData();
@@ -102,6 +103,24 @@ const App: React.FC = () => {
       return () => navigator.geolocation.clearWatch(watchId);
     }
   }, []);
+
+  // Sync currentPassedBy with today's dailyPasses value when day changes or data loads
+  useEffect(() => {
+    if (userState && !dataLoading) {
+      const today = new Date().toLocaleDateString('en-CA');
+      const todayPasses = userState.dailyPasses[today] || 0;
+      // Only update if currentPassedBy doesn't match today's passes and we're not in the middle of an update
+      if (userState.currentPassedBy !== todayPasses && !updatePassedByRef.current) {
+        setUserState(prev => {
+          // Double-check the date hasn't changed during the update
+          const currentToday = new Date().toLocaleDateString('en-CA');
+          const currentTodayPasses = prev.dailyPasses[currentToday] || 0;
+          return { ...prev, currentPassedBy: currentTodayPasses };
+        });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userState?.dailyPasses, dataLoading]);
 
   const handleVerifySuccess = (isRejection: boolean = false, customDate?: string) => {
     const today = customDate || new Date().toLocaleDateString('en-CA');
@@ -242,9 +261,16 @@ const App: React.FC = () => {
   };
 
   const updatePassedBy = (delta: number) => {
+    // Prevent double clicks/rapid calls
+    if (updatePassedByRef.current) return;
+    updatePassedByRef.current = true;
+    
     const today = new Date().toLocaleDateString('en-CA');
     setUserState(prev => {
-      if (prev.isOnBreak && delta > 0) return prev; 
+      if (prev.isOnBreak && delta > 0) {
+        updatePassedByRef.current = false;
+        return prev;
+      }
       const newCurrent = Math.max(0, prev.currentPassedBy + delta);
       const newDailyPasses = { ...prev.dailyPasses };
       if (delta > 0) {
@@ -255,8 +281,14 @@ const App: React.FC = () => {
       const newStats = { ...prev.stats };
       if (delta > 0) newStats.totalPassedBy += delta;
       else if (delta < 0) newStats.totalPassedBy = Math.max(0, newStats.totalPassedBy + delta);
+      
       return { ...prev, currentPassedBy: newCurrent, dailyPasses: newDailyPasses, stats: newStats };
     });
+    
+    // Reset ref after a short delay to allow state update to complete
+    setTimeout(() => {
+      updatePassedByRef.current = false;
+    }, 150);
   };
 
   const toggleBreakMode = (active: boolean) => {
@@ -537,9 +569,30 @@ const BaseHub: React.FC<{
       <div className={`bg-dark-card border border-gold/10 rounded-3xl p-6 relative overflow-hidden text-center space-y-4 shadow-xl transition-all duration-500 ${userState.isOnBreak ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
         <p className="text-[10px] font-black uppercase text-gold tracking-widest">Resistance Tracker</p>
         <div className="flex items-center justify-center space-x-8">
-          <button onClick={() => onUpdatePassedBy(-1)} className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center active:bg-gold active:text-black"><Minus size={20} /></button>
-          <div className="flex flex-col items-center min-w-[60px]"><span className="text-5xl font-black italic tracking-tighter text-gold transition-all tabular-nums">{userState.currentPassedBy}</span><span className="text-[8px] font-black uppercase tracking-widest text-gold/40">Passed By</span></div>
-          <button onClick={() => onUpdatePassedBy(1)} className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center active:bg-gold active:text-black"><Plus size={20} /></button>
+          <button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onUpdatePassedBy(-1);
+            }} 
+            className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center active:bg-gold active:text-black hover:bg-white/10 transition-colors"
+          >
+            <Minus size={20} />
+          </button>
+          <div className="flex flex-col items-center min-w-[60px]">
+            <span className="text-5xl font-black italic tracking-tighter text-gold transition-all tabular-nums">{userState.currentPassedBy}</span>
+            <span className="text-[8px] font-black uppercase tracking-widest text-gold/40">Passed By</span>
+          </div>
+          <button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onUpdatePassedBy(1);
+            }} 
+            className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center active:bg-gold active:text-black hover:bg-white/10 transition-colors"
+          >
+            <Plus size={20} />
+          </button>
         </div>
       </div>
 
