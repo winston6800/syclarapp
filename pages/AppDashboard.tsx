@@ -1,11 +1,11 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import App from '../App';
-import { Flame, Crown, Settings, LogOut } from 'lucide-react';
+import { Flame, Crown, Settings, LogOut, AlertTriangle, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const AppDashboard: React.FC = () => {
-  const { isTrialing, trialDaysRemaining, signOut, profile } = useAuth();
+  const { isTrialing, trialDaysRemaining, signOut, profile, cancelAtPeriodEnd, daysUntilCancellation } = useAuth();
 
   return (
     <div className="relative">
@@ -29,8 +29,28 @@ const AppDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* Cancellation Pending Banner */}
+      {cancelAtPeriodEnd && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-amber-500/20 to-amber-500/10 border-b border-amber-500/30">
+          <div className="max-w-md mx-auto px-4 py-2 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Clock className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-bold text-amber-400">
+                {daysUntilCancellation} day{daysUntilCancellation !== 1 ? 's' : ''} left before cancellation
+              </span>
+            </div>
+            <Link 
+              to="/account"
+              className="text-[10px] font-bold text-amber-400/80 hover:text-amber-400 transition uppercase tracking-wider"
+            >
+              Reactivate
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Active Subscription Badge */}
-      {profile?.subscription_status === 'active' && (
+      {profile?.subscription_status === 'active' && !cancelAtPeriodEnd && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-gold/10 to-transparent">
           <div className="max-w-md mx-auto px-4 py-2 flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -48,7 +68,7 @@ const AppDashboard: React.FC = () => {
       )}
 
       {/* Main App - add padding for banner */}
-      <div className={isTrialing || profile?.subscription_status === 'active' ? 'pt-10' : ''}>
+      <div className={isTrialing || profile?.subscription_status === 'active' || cancelAtPeriodEnd ? 'pt-10' : ''}>
         <App />
       </div>
     </div>
@@ -56,5 +76,7 @@ const AppDashboard: React.FC = () => {
 };
 
 export default AppDashboard;
+
+
 
 

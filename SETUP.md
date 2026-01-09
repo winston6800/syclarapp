@@ -43,9 +43,15 @@ CREATE TABLE public.profiles (
   subscription_status TEXT DEFAULT 'none' CHECK (subscription_status IN ('none', 'trialing', 'active', 'canceled', 'past_due')),
   trial_ends_at TIMESTAMPTZ,
   current_period_end TIMESTAMPTZ,
+  cancel_at_period_end BOOLEAN DEFAULT FALSE,
+  canceled_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- If migrating existing database, run:
+-- ALTER TABLE public.profiles ADD COLUMN cancel_at_period_end BOOLEAN DEFAULT FALSE;
+-- ALTER TABLE public.profiles ADD COLUMN canceled_at TIMESTAMPTZ;
 
 -- Enable RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -305,6 +311,8 @@ serve(async (req) => {
         subscription_status: subscription.status,
         trial_ends_at: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
         current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        cancel_at_period_end: subscription.cancel_at_period_end,
+        canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
       })
       break
     }
@@ -314,6 +322,8 @@ serve(async (req) => {
       await updateProfile(subscription.customer as string, {
         subscription_status: 'canceled',
         subscription_id: null,
+        cancel_at_period_end: false,
+        canceled_at: new Date().toISOString(),
       })
       break
     }
@@ -364,6 +374,213 @@ serve(async (req) => {
 })
 ```
 
+### Function 4: cancel-subscription
+
+```typescript
+// supabase/functions/cancel-subscription/index.ts
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import Stripe from 'https://esm.sh/stripe@13.10.0'
+
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
+  apiVersion: '2023-10-16',
+})
+
+serve(async (req) => {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  }
+
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    // Get the authorization header
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Verify the JWT token
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
+    )
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const { userId, subscriptionId } = await req.json()
+    
+    // Verify userId matches authenticated user
+    if (userId !== user.id) {
+      return new Response(JSON.stringify({ error: 'User ID mismatch' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (!subscriptionId) {
+      return new Response(JSON.stringify({ error: 'No subscription ID provided' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Cancel the subscription at period end (not immediately)
+    const subscription = await stripe.subscriptions.update(subscriptionId, {
+      cancel_at_period_end: true,
+    })
+
+    // Update the profile in database
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+
+    await supabaseAdmin
+      .from('profiles')
+      .update({
+        cancel_at_period_end: true,
+        canceled_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId)
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      cancel_at: subscription.cancel_at,
+      current_period_end: subscription.current_period_end 
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+})
+```
+
+### Function 5: reactivate-subscription
+
+```typescript
+// supabase/functions/reactivate-subscription/index.ts
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import Stripe from 'https://esm.sh/stripe@13.10.0'
+
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
+  apiVersion: '2023-10-16',
+})
+
+serve(async (req) => {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  }
+
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    // Get the authorization header
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Verify the JWT token
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
+    )
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const { userId, subscriptionId } = await req.json()
+    
+    // Verify userId matches authenticated user
+    if (userId !== user.id) {
+      return new Response(JSON.stringify({ error: 'User ID mismatch' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (!subscriptionId) {
+      return new Response(JSON.stringify({ error: 'No subscription ID provided' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Reactivate the subscription (remove cancel_at_period_end)
+    const subscription = await stripe.subscriptions.update(subscriptionId, {
+      cancel_at_period_end: false,
+    })
+
+    // Update the profile in database
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+
+    await supabaseAdmin
+      .from('profiles')
+      .update({
+        cancel_at_period_end: false,
+        canceled_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId)
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      status: subscription.status 
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+})
+```
+
 ### Deploy Edge Functions
 ```bash
 # Install Supabase CLI
@@ -383,6 +600,8 @@ supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_xxx
 supabase functions deploy create-checkout-session
 supabase functions deploy stripe-webhook
 supabase functions deploy create-portal-session
+supabase functions deploy cancel-subscription
+supabase functions deploy reactivate-subscription
 ```
 
 ---
@@ -406,14 +625,32 @@ Add these in Vercel project settings:
 
 ## 6. Testing Checklist
 
+### Authentication
 - [ ] User can sign up and receives confirmation email
 - [ ] User can log in after confirming email
 - [ ] Unauthenticated users redirected to login
+
+### Subscription Flow
 - [ ] Authenticated users without subscription redirected to subscribe page
 - [ ] Stripe checkout creates subscription with 3-day trial
 - [ ] User can access app during trial
+- [ ] Trial banner shows days remaining
 - [ ] User can manage billing via Stripe portal
 - [ ] Subscription status updates via webhook
+
+### Trial Expiration
+- [ ] When trial expires, user is redirected to trial-expired page
+- [ ] Trial-expired page shows resubscribe option (without trial)
+- [ ] User can subscribe from trial-expired page
+- [ ] After subscribing, user is redirected to app
+
+### Subscription Cancellation
+- [ ] User can cancel subscription from Account page
+- [ ] Cancel modal shows warning and what they'll lose
+- [ ] After canceling, "Cancellation pending" banner shows
+- [ ] User can reactivate subscription before period ends
+- [ ] After period ends, user is redirected to trial-expired page
+- [ ] Subscription status correctly updates via webhook
 
 ---
 

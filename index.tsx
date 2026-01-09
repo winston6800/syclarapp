@@ -10,6 +10,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
 import Subscribe from './pages/Subscribe';
+import TrialExpired from './pages/TrialExpired';
 import AppDashboard from './pages/AppDashboard';
 import Account from './pages/Account';
 
@@ -36,6 +37,16 @@ root.render(
             element={
               <ProtectedRoute requireSubscription={false}>
                 <Subscribe />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Trial expired page - auth required, no subscription needed */}
+          <Route 
+            path="/trial-expired" 
+            element={
+              <ProtectedRoute requireSubscription={false}>
+                <TrialExpired />
               </ProtectedRoute>
             } 
           />

@@ -15,6 +15,10 @@ interface AuthContextType {
   hasActiveSubscription: boolean;
   isTrialing: boolean;
   trialDaysRemaining: number;
+  isTrialExpired: boolean;
+  isCanceled: boolean;
+  cancelAtPeriodEnd: boolean;
+  daysUntilCancellation: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -141,23 +145,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Calculate subscription status
+  const isTrialing = profile?.subscription_status === 'trialing';
+  
+  const trialDaysRemaining = profile?.trial_ends_at
+    ? Math.max(0, Math.ceil((new Date(profile.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  // Check if trial has expired (was trialing but trial_ends_at is in the past)
+  const isTrialExpired = 
+    profile?.subscription_status === 'none' && 
+    profile?.trial_ends_at !== null && 
+    new Date(profile.trial_ends_at).getTime() < Date.now();
+
+  // Check if subscription is canceled
+  const isCanceled = profile?.subscription_status === 'canceled';
+  
+  // Check if subscription will cancel at period end (still active but scheduled for cancellation)
+  const cancelAtPeriodEnd = profile?.cancel_at_period_end === true;
+  
+  // Calculate days until cancellation takes effect
+  const daysUntilCancellation = cancelAtPeriodEnd && profile?.current_period_end
+    ? Math.max(0, Math.ceil((new Date(profile.current_period_end).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  // Active subscription includes active or trialing (but not if trial has expired via time check)
   const hasActiveSubscription = 
     profile?.subscription_status === 'active' || 
-    profile?.subscription_status === 'trialing';
-
-  const isTrialing = profile?.subscription_status === 'trialing';
+    (profile?.subscription_status === 'trialing' && trialDaysRemaining > 0);
   
   // Debug logging
   console.log('🔐 Subscription check:', {
     profile_subscription_status: profile?.subscription_status,
     hasActiveSubscription,
     isTrialing,
+    isTrialExpired,
+    isCanceled,
+    cancelAtPeriodEnd,
+    trialDaysRemaining,
     profile_exists: !!profile,
   });
-
-  const trialDaysRemaining = profile?.trial_ends_at
-    ? Math.max(0, Math.ceil((new Date(profile.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : 0;
 
   return (
     <AuthContext.Provider
@@ -174,6 +200,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hasActiveSubscription,
         isTrialing,
         trialDaysRemaining,
+        isTrialExpired,
+        isCanceled,
+        cancelAtPeriodEnd,
+        daysUntilCancellation,
       }}
     >
       {children}

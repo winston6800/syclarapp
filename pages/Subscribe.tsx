@@ -11,7 +11,7 @@ import {
 const Subscribe: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { user, session, signOut, profile, isTrialing, trialDaysRemaining } = useAuth();
+  const { user, session, signOut, profile, isTrialing, trialDaysRemaining, isTrialExpired, isCanceled } = useAuth();
   const navigate = useNavigate();
 
   const handleStartTrial = async () => {
@@ -112,6 +112,12 @@ const Subscribe: React.FC = () => {
     await signOut();
     navigate('/login');
   };
+
+  // If trial has expired or subscription was canceled, redirect to trial-expired page
+  if (isTrialExpired || isCanceled) {
+    navigate('/trial-expired');
+    return null;
+  }
 
   // If user already has trial/subscription that's valid, redirect to app
   if (isTrialing || profile?.subscription_status === 'active') {
