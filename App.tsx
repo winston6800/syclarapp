@@ -393,7 +393,14 @@ const FrequencyMap: React.FC<{ data: { date: string, passes: number, isFocus: bo
           <Briefcase size={10} className="text-blue-100" />
         ) : (
           <>
-            {day.passes > 0 && <span className="text-[10px] font-black tabular-nums">{day.passes}</span>}
+            {(day.passes > 0 || day.hasApproach) && (
+              <span 
+                className="text-[10px] font-black tabular-nums" 
+                style={day.passes === 0 && day.hasApproach ? { color: '#fff' } : undefined}
+              >
+                {day.passes}
+              </span>
+            )}
             {day.hasApproach && (
               <div className="absolute top-0.5 right-0.5 opacity-60">
                 <Check size={8} strokeWidth={4} />
