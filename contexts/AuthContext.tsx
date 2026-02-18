@@ -169,9 +169,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     : 0;
 
   // Active subscription includes active or trialing (but not if trial has expired via time check)
-  const hasActiveSubscription = 
-    profile?.subscription_status === 'active' || 
-    (profile?.subscription_status === 'trialing' && trialDaysRemaining > 0);
+  // TEMPORARY: Auto-grant full access to everyone
+  const hasActiveSubscription = true; // Always grant access
+    // profile?.subscription_status === 'active' || 
+    // (profile?.subscription_status === 'trialing' && trialDaysRemaining > 0);
   
   // Debug logging
   console.log('🔐 Subscription check:', {
