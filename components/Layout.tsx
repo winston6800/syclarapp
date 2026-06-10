@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppScreen } from '../types';
-import { Home, Award, Settings, LogOut } from 'lucide-react';
+import { Home, Award, Settings, LogOut, CalendarDays } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
@@ -113,11 +113,17 @@ const Layout: React.FC<LayoutProps> = ({ children, activeScreen, onNavigate }) =
           icon={<Home size={20} />}
           label="Base"
         />
-        <NavButton 
-          active={activeScreen === AppScreen.ACHIEVEMENTS} 
+        <NavButton
+          active={activeScreen === AppScreen.ACHIEVEMENTS}
           onClick={() => onNavigate(AppScreen.ACHIEVEMENTS)}
           icon={<Award size={20} />}
           label="Stats"
+        />
+        <NavButton
+          active={activeScreen === AppScreen.EVENTS}
+          onClick={() => onNavigate(AppScreen.EVENTS)}
+          icon={<CalendarDays size={20} />}
+          label="Events"
         />
       </nav>
     </div>

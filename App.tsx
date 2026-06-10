@@ -4,7 +4,8 @@ import Layout from './components/Layout';
 import { AppScreen, Achievement, UserState, Difficulty, UserStats, Location } from './types';
 import { verifyApproachScreenshot } from './services/geminiService';
 import { useUserData } from './hooks/useUserData';
-import { Trophy, Zap, AlertCircle, CheckCircle2, Play, RefreshCw, X, Flame, Calendar, Award, MapPin, Clock, ShieldCheck, Target, Camera, Loader2, UserCheck, Map as MapIcon, Home as HomeIcon, Settings, Terminal, Plus, Minus, UserMinus, Crosshair, Navigation, Eye, EyeOff, CheckCircle, Trash2, FastForward, Dice5, Coffee, ZapOff, ChevronRight, ChevronDown, ChevronLeft, Briefcase, History, BarChart3, Check, Quote, Star, Filter } from 'lucide-react';
+import { Trophy, Zap, AlertCircle, CheckCircle2, Play, RefreshCw, X, Flame, Calendar, Award, MapPin, Clock, ShieldCheck, Target, Camera, Loader2, UserCheck, Map as MapIcon, Home as HomeIcon, Settings, Terminal, Plus, Minus, UserMinus, Crosshair, Navigation, Eye, EyeOff, CheckCircle, Trash2, FastForward, Dice5, Coffee, ZapOff, ChevronRight, ChevronDown, ChevronLeft, Briefcase, History, BarChart3, Check, Quote, Star, Filter, CalendarPlus, Sun, Cloud, Wifi, Globe, Edit2 } from 'lucide-react';
+import { SocialEvent, EventEnvironment } from './types';
 
 /**
  * Utility to calculate the current streak based on activity dates.
@@ -335,6 +336,7 @@ const App: React.FC = () => {
           />
         )}
         {screen === AppScreen.BREATHE && <BreatheModule />}
+        {screen === AppScreen.EVENTS && <EventsScreen />}
 
         <div className="fixed bottom-24 right-4 z-50">
           <button onClick={() => setDevMenuOpen(!devMenuOpen)} className="w-10 h-10 bg-gold/20 backdrop-blur-md border border-gold/30 rounded-full flex items-center justify-center text-gold hover:bg-gold/40 shadow-lg transition-transform active:scale-90">
@@ -365,6 +367,215 @@ const App: React.FC = () => {
     </Layout>
   );
 };
+
+const ENV_OPTIONS: { value: EventEnvironment; label: string; icon: React.ReactNode }[] = [
+  { value: 'any',     label: 'Any',     icon: <Globe size={14} /> },
+  { value: 'outdoor', label: 'Outdoor', icon: <Sun size={14} /> },
+  { value: 'indoor',  label: 'Indoor',  icon: <Cloud size={14} /> },
+  { value: 'online',  label: 'Online',  icon: <Wifi size={14} /> },
+];
+
+const EVENTS_KEY = 'syclar_events';
+
+const loadEvents = (): SocialEvent[] => {
+  try { return JSON.parse(localStorage.getItem(EVENTS_KEY) || '[]'); } catch { return []; }
+};
+
+const saveEvents = (events: SocialEvent[]) => {
+  localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
+};
+
+const EventsScreen: React.FC = () => {
+  const [events, setEvents] = useState<SocialEvent[]>(loadEvents);
+  const [showForm, setShowForm] = useState(false);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [environment, setEnvironment] = useState<EventEnvironment>('any');
+  const [location, setLocation] = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+
+  const resetForm = () => {
+    setTitle(''); setDescription(''); setEnvironment('any');
+    setLocation(''); setDate(''); setTime('');
+    setShowForm(false);
+  };
+
+  const handleCreate = () => {
+    if (!title.trim() || !date) return;
+    const newEvent: SocialEvent = {
+      id: Date.now().toString(),
+      title: title.trim(),
+      description: description.trim(),
+      environment,
+      location: location.trim(),
+      date,
+      time,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [newEvent, ...events];
+    setEvents(updated);
+    saveEvents(updated);
+    resetForm();
+  };
+
+  const handleDelete = (id: string) => {
+    const updated = events.filter(e => e.id !== id);
+    setEvents(updated);
+    saveEvents(updated);
+  };
+
+  const upcoming = events.filter(e => e.date >= new Date().toLocaleDateString('en-CA')).sort((a, b) => a.date.localeCompare(b.date));
+  const past = events.filter(e => e.date < new Date().toLocaleDateString('en-CA')).sort((a, b) => b.date.localeCompare(a.date));
+
+  return (
+    <div className="space-y-4 pb-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-black text-white uppercase tracking-tight">Events</h2>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center space-x-1.5 px-3 py-1.5 bg-gold text-black text-xs font-bold rounded-xl hover:bg-gold/90 transition active:scale-95"
+        >
+          <CalendarPlus size={14} />
+          <span>New Event</span>
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="bg-dark-accent/60 border border-gold/20 rounded-2xl p-4 space-y-3">
+          <h3 className="text-sm font-black text-gold uppercase tracking-wider">Create Event</h3>
+
+          <input
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="Event title"
+            className="w-full px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:border-gold focus:outline-none"
+          />
+
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="Description (optional)"
+            rows={2}
+            className="w-full px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:border-gold focus:outline-none resize-none"
+          />
+
+          <div>
+            <p className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-1.5">Environment</p>
+            <div className="flex space-x-2">
+              {ENV_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setEnvironment(opt.value)}
+                  className={`flex-1 flex flex-col items-center py-2 rounded-xl text-[10px] font-bold uppercase transition border ${environment === opt.value ? 'bg-gold/20 border-gold text-gold' : 'bg-black/30 border-white/10 text-white/40 hover:border-white/20'}`}
+                >
+                  {opt.icon}
+                  <span className="mt-0.5">{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <input
+            value={location}
+            onChange={e => setLocation(e.target.value)}
+            placeholder="Location (optional)"
+            className="w-full px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:border-gold focus:outline-none"
+          />
+
+          <div className="flex space-x-2">
+            <input
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              className="flex-1 px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white text-sm focus:border-gold focus:outline-none"
+            />
+            <input
+              type="time"
+              value={time}
+              onChange={e => setTime(e.target.value)}
+              className="flex-1 px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white text-sm focus:border-gold focus:outline-none"
+            />
+          </div>
+
+          <div className="flex space-x-2 pt-1">
+            <button onClick={resetForm} className="flex-1 py-2.5 border border-white/10 rounded-xl text-white/50 text-sm font-bold hover:border-white/20 transition">
+              Cancel
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={!title.trim() || !date}
+              className="flex-1 py-2.5 bg-gold text-black text-sm font-bold rounded-xl hover:bg-gold/90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Create
+            </button>
+          </div>
+        </div>
+      )}
+
+      {upcoming.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Upcoming</p>
+          {upcoming.map(event => <EventCard key={event.id} event={event} onDelete={handleDelete} />)}
+        </div>
+      )}
+
+      {past.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mt-4">Past</p>
+          {past.map(event => <EventCard key={event.id} event={event} onDelete={handleDelete} past />)}
+        </div>
+      )}
+
+      {events.length === 0 && !showForm && (
+        <div className="text-center py-16 space-y-3">
+          <CalendarPlus className="w-10 h-10 text-gold/30 mx-auto" />
+          <p className="text-white/30 text-sm">No events yet.</p>
+          <p className="text-white/20 text-xs">Create one to plan your next social outing.</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ENV_ICON: Record<EventEnvironment, React.ReactNode> = {
+  any:     <Globe size={11} />,
+  outdoor: <Sun size={11} />,
+  indoor:  <Cloud size={11} />,
+  online:  <Wifi size={11} />,
+};
+
+const EventCard: React.FC<{ event: SocialEvent; onDelete: (id: string) => void; past?: boolean }> = ({ event, onDelete, past }) => (
+  <div className={`bg-dark-accent/40 border rounded-2xl p-4 space-y-2 ${past ? 'border-white/5 opacity-60' : 'border-gold/20'}`}>
+    <div className="flex items-start justify-between">
+      <div className="flex-1 min-w-0">
+        <p className={`font-black text-sm truncate ${past ? 'text-white/50' : 'text-white'}`}>{event.title}</p>
+        {event.description && <p className="text-white/40 text-xs mt-0.5 line-clamp-2">{event.description}</p>}
+      </div>
+      <button onClick={() => onDelete(event.id)} className="ml-2 p-1 text-white/20 hover:text-red-400 transition flex-shrink-0">
+        <Trash2 size={14} />
+      </button>
+    </div>
+
+    <div className="flex flex-wrap gap-2">
+      <span className="flex items-center space-x-1 px-2 py-0.5 bg-gold/10 border border-gold/20 rounded-full text-[10px] font-bold text-gold/80">
+        {ENV_ICON[event.environment]}
+        <span className="ml-1 capitalize">{event.environment}</span>
+      </span>
+      <span className="flex items-center space-x-1 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full text-[10px] text-white/50">
+        <Calendar size={10} />
+        <span className="ml-1">{new Date(event.date + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+        {event.time && <span>· {event.time}</span>}
+      </span>
+      {event.location && (
+        <span className="flex items-center space-x-1 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full text-[10px] text-white/50">
+          <MapPin size={10} />
+          <span className="ml-1">{event.location}</span>
+        </span>
+      )}
+    </div>
+  </div>
+);
 
 const getBoxStyles = (passes: number, isFocus?: boolean) => {
   if (isFocus) return { backgroundColor: 'rgba(59, 130, 246, 0.4)', border: '1px solid rgba(59, 130, 246, 0.6)', color: '#fff' };

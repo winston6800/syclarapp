@@ -50,5 +50,19 @@ export enum AppScreen {
   BASE = 'BASE',
   DASHBOARD = 'DASHBOARD',
   ACHIEVEMENTS = 'ACHIEVEMENTS',
-  BREATHE = 'BREATHE'
+  BREATHE = 'BREATHE',
+  EVENTS = 'EVENTS'
+}
+
+export type EventEnvironment = 'indoor' | 'outdoor' | 'online' | 'any';
+
+export interface SocialEvent {
+  id: string;
+  title: string;
+  description: string;
+  environment: EventEnvironment;
+  location: string;
+  date: string;
+  time: string;
+  createdAt: string;
 }
