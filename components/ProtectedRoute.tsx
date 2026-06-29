@@ -52,24 +52,23 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // TEMPORARY: Bypass all subscription checks - grant full access to everyone
   // Check for trial expiration - redirect to dedicated trial expired page
-  // if (requireSubscription && isTrialExpired) {
-  //   console.log('🛡️ Trial expired, redirecting to trial-expired page');
-  //   return <Navigate to="/trial-expired" state={{ from: location }} replace />;
-  // }
+  if (requireSubscription && isTrialExpired) {
+    console.log('🛡️ Trial expired, redirecting to trial-expired page');
+    return <Navigate to="/trial-expired" state={{ from: location }} replace />;
+  }
 
-  // // Check for canceled subscription - redirect to trial expired page (which handles resubscription)
-  // if (requireSubscription && isCanceled) {
-  //   console.log('🛡️ Subscription canceled, redirecting to trial-expired page');
-  //   return <Navigate to="/trial-expired" state={{ from: location }} replace />;
-  // }
+  // Check for canceled subscription - redirect to trial expired page (which handles resubscription)
+  if (requireSubscription && isCanceled) {
+    console.log('🛡️ Subscription canceled, redirecting to trial-expired page');
+    return <Navigate to="/trial-expired" state={{ from: location }} replace />;
+  }
 
-  // // Check if they need a subscription but don't have one
-  // if (requireSubscription && !hasActiveSubscription && !isTrialing) {
-  //   console.log('🛡️ No subscription/trial, redirecting to subscribe');
-  //   return <Navigate to="/subscribe" state={{ from: location }} replace />;
-  // }
+  // Check if they need a subscription but don't have one
+  if (requireSubscription && !hasActiveSubscription && !isTrialing) {
+    console.log('🛡️ No subscription/trial, redirecting to subscribe');
+    return <Navigate to="/subscribe" state={{ from: location }} replace />;
+  }
 
   console.log('🛡️ Access granted!');
   return <>{children}</>;
