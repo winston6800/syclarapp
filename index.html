@@ -3,56 +3,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Syclar - Overcome Social Anxiety</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              gold: {
-                DEFAULT: '#D4AF37',
-                light: '#F4CF67',
-                dark: '#A68926',
-              },
-              dark: {
-                DEFAULT: '#0A0A0A',
-                card: '#141414',
-                accent: '#1F1F1F',
-              }
-            },
-            animation: {
-              'spin-slow': 'spin 8s linear infinite',
-              'pulse-slow': 'pulse-custom 4s ease-in-out infinite',
-            },
-            keyframes: {
-              'pulse-custom': {
-                '0%, 100%': { boxShadow: '0 0 10px rgba(212, 175, 55, 0.1)' },
-                '50%': { boxShadow: '0 0 30px rgba(212, 175, 55, 0.4)' },
-              }
-            }
-          }
-        }
-      }
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#08070c" />
+    <title>Dream Doodle</title>
     <style>
-      body { font-family: 'Inter', sans-serif; background-color: #000000; color: #FFFFFF; }
-      .bg-gradient-gold {
-        background: linear-gradient(135deg, #141414 0%, #000000 100%);
-      }
-      .glass-card {
-        background: rgba(20, 20, 20, 0.8);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(212, 175, 55, 0.2);
-      }
-      .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-      .custom-scrollbar::-webkit-scrollbar-thumb { background: #D4AF37; border-radius: 10px; }
+      html, body { overscroll-behavior: none; touch-action: none; }
+      body { margin: 0; background-color: #08070c; color: #e8e6f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow: hidden; }
     </style>
   </head>
-  <body class="bg-gradient-gold min-h-screen">
+  <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

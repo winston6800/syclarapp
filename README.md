@@ -1,53 +1,28 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Dream Doodle
 
-# Syclar - Social Confidence Coach
+A no-login, no-account doodling app for winding down at night. Fullscreen dark canvas, a dimmer to lower screen brightness, a soft low-glare color palette, and your drawing auto-saved locally so it's there when you wake up.
 
-A premium coaching app to overcome social anxiety through daily action, accountability tracking, and AI-powered verification.
+## Quick Start
 
-## 🚀 Quick Start
+```bash
+npm install
+npm run dev
+```
 
-### Run Locally
+Open the printed local URL in your browser.
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
+## Build
 
-2. Create `.env` file:
-   ```env
-   VITE_SUPABASE_URL=your_supabase_url
-   VITE_SUPABASE_ANON_KEY=your_anon_key
-   VITE_STRIPE_PUBLISHABLE_KEY=pk_test_xxx
-   VITE_STRIPE_PRICE_ID=price_xxx
-   GEMINI_API_KEY=your_gemini_key
-   ```
+```bash
+npm run build
+npm run preview
+```
 
-3. Run the app:
-   ```bash
-   npm run dev
-   ```
+## Features
 
-### Deploy to Production
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for full deployment guide.
-
-**Quick Vercel Deploy:**
-1. Push to GitHub
-2. Import repo in [Vercel](https://vercel.com)
-3. Add environment variables
-4. Deploy!
-
-## 📚 Documentation
-
-- [SETUP.md](./SETUP.md) - Complete setup guide (Supabase + Stripe)
-- [DEPLOYMENT.md](./DEPLOYMENT.md) - Deployment & testing guide
-
-## 🛠️ Tech Stack
-
-- **Frontend:** React + TypeScript + Vite
-- **Auth & Database:** Supabase
-- **Payments:** Stripe
-- **AI:** Google Gemini
-- **Deployment:** Vercel
+- Draw with mouse, touch, or stylus — fullscreen canvas
+- Soft, low-blue-light color palette plus a custom color picker
+- Adjustable brush size and eraser
+- Undo, clear, and download your doodle as a PNG
+- Screen dimmer slider for use in bed at night
+- Drawing auto-saves to your browser's local storage — no account, no server, no sign-in
