@@ -19,9 +19,22 @@ const Signup: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   
   const { signUp, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setGoogleLoading(true);
+    const { error: googleError } = await signInWithGoogle();
+    // On success the browser is redirected to Google, so this only runs on failure.
+    if (googleError) {
+      console.error('🔐 Google sign in failed:', googleError.message);
+      setError(googleError.message);
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,11 +124,12 @@ const Signup: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => signInWithGoogle()}
-            className="w-full py-3.5 bg-white text-gray-800 font-semibold rounded-xl hover:bg-gray-100 transition flex items-center justify-center space-x-3 mb-6"
+            onClick={handleGoogleSignIn}
+            disabled={googleLoading}
+            className="w-full py-3.5 bg-white text-gray-800 font-semibold rounded-xl hover:bg-gray-100 transition flex items-center justify-center space-x-3 mb-6 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <GoogleIcon />
-            <span>Continue with Google</span>
+            {googleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <GoogleIcon />}
+            <span>{googleLoading ? 'Redirecting to Google...' : 'Continue with Google'}</span>
           </button>
 
           <div className="flex items-center space-x-3 mb-6">

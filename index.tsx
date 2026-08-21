@@ -13,6 +13,7 @@ import Subscribe from './pages/Subscribe';
 import TrialExpired from './pages/TrialExpired';
 import AppDashboard from './pages/AppDashboard';
 import Account from './pages/Account';
+import AuthCallback from './pages/AuthCallback';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -69,8 +70,8 @@ root.render(
             } 
           />
 
-          {/* Auth callback for Supabase */}
-          <Route path="/auth/callback" element={<Navigate to="/app" replace />} />
+          {/* Auth callback for Supabase (OAuth + email confirmation) */}
+          <Route path="/auth/callback" element={<AuthCallback />} />
           
           {/* Catch all */}
           <Route path="*" element={<Navigate to="/" replace />} />

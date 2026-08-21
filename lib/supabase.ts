@@ -12,7 +12,18 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    // OAuth uses the PKCE flow: the provider redirects back to /auth/callback
+    // with a `?code=`, which supabase-js exchanges for a session on startup.
+    // `/auth/callback` must therefore keep that URL intact until the exchange
+    // has run — see pages/AuthCallback.tsx.
+    flowType: 'pkce',
+    detectSessionInUrl: true,
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
 
 export type SubscriptionStatus = 'trialing' | 'active' | 'canceled' | 'past_due' | 'none';
 
