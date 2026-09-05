@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppScreen } from '../types';
-import { Home, Award, Settings, LogOut, CalendarDays } from 'lucide-react';
+import { Home, Award, Settings, LogOut, CalendarDays, Heart } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
@@ -124,6 +124,12 @@ const Layout: React.FC<LayoutProps> = ({ children, activeScreen, onNavigate }) =
           onClick={() => onNavigate(AppScreen.EVENTS)}
           icon={<CalendarDays size={20} />}
           label="Events"
+        />
+        <NavButton
+          active={activeScreen === AppScreen.DATES}
+          onClick={() => onNavigate(AppScreen.DATES)}
+          icon={<Heart size={20} />}
+          label="Dates"
         />
       </nav>
     </div>

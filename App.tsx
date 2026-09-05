@@ -4,8 +4,8 @@ import Layout from './components/Layout';
 import { AppScreen, Achievement, UserState, Difficulty, UserStats, Location } from './types';
 import { verifyApproachScreenshot } from './services/geminiService';
 import { useUserData } from './hooks/useUserData';
-import { Trophy, Zap, AlertCircle, CheckCircle2, Play, RefreshCw, X, Flame, Calendar, Award, MapPin, Clock, ShieldCheck, Target, Camera, Loader2, UserCheck, Map as MapIcon, Home as HomeIcon, Settings, Terminal, Plus, Minus, UserMinus, Crosshair, Navigation, Eye, EyeOff, CheckCircle, Trash2, FastForward, Dice5, Coffee, ZapOff, ChevronRight, ChevronDown, ChevronLeft, Briefcase, History, BarChart3, Check, Quote, Star, Filter, CalendarPlus, Sun, Cloud, Wifi, Globe, Edit2 } from 'lucide-react';
-import { SocialEvent, EventEnvironment } from './types';
+import { Trophy, Zap, AlertCircle, CheckCircle2, Play, RefreshCw, X, Flame, Calendar, Award, MapPin, Clock, ShieldCheck, Target, Camera, Loader2, UserCheck, Map as MapIcon, Home as HomeIcon, Settings, Terminal, Plus, Minus, UserMinus, Crosshair, Navigation, Eye, EyeOff, CheckCircle, Trash2, FastForward, Dice5, Coffee, ZapOff, ChevronRight, ChevronDown, ChevronLeft, Briefcase, History, BarChart3, Check, Quote, Star, Filter, CalendarPlus, Sun, Cloud, Wifi, Globe, Edit2, Heart, Square, CheckSquare, UserPlus, Sparkles } from 'lucide-react';
+import { SocialEvent, EventEnvironment, DateConnection, DateMilestones } from './types';
 
 /**
  * Utility to calculate the current streak based on activity dates.
@@ -51,7 +51,8 @@ const HeadlineRoller: React.FC = () => {
     "Do not be intimidated by anyone, authority, crowds, or haters.",
     "Reclaim your freedom to act.",
     "Action is the only antidote to anxiety.",
-    "High value is shared energy, not social performance."
+    "High value is shared energy, not social performance.",
+    "It hurts far more not to approach than to be rejected."
   ];
 
   const [index, setIndex] = useState(0);
@@ -375,6 +376,7 @@ const App: React.FC = () => {
         )}
         {screen === AppScreen.BREATHE && <BreatheModule />}
         {screen === AppScreen.EVENTS && <EventsScreen onOutingCompleted={markOutingCompleted} />}
+        {screen === AppScreen.DATES && <DatesScreen />}
 
         <div className="fixed bottom-24 right-4 z-50">
           <button onClick={() => setDevMenuOpen(!devMenuOpen)} className="w-10 h-10 bg-gold/20 backdrop-blur-md border border-gold/30 rounded-full flex items-center justify-center text-gold hover:bg-gold/40 shadow-lg transition-transform active:scale-90">
@@ -637,6 +639,205 @@ const EventCard: React.FC<{ event: SocialEvent; onDelete: (id: string) => void; 
   </div>
 );
 
+const DATES_KEY = 'syclar_dates';
+
+const loadDateConnections = (): DateConnection[] => {
+  try { return JSON.parse(localStorage.getItem(DATES_KEY) || '[]'); } catch { return []; }
+};
+
+const saveDateConnections = (connections: DateConnection[]) => {
+  localStorage.setItem(DATES_KEY, JSON.stringify(connections));
+};
+
+const getDefaultMilestones = (): DateMilestones => ({
+  gotContact: false,
+  firstDate: false,
+  physicalTouch: false,
+  firstKiss: false,
+  regularCommunication: false,
+  metCircle: false,
+  deepConversation: false,
+  exclusive: false,
+});
+
+const MILESTONE_CONFIG: { key: keyof DateMilestones; label: string }[] = [
+  { key: 'gotContact', label: 'Got Her Number' },
+  { key: 'firstDate', label: 'First Date' },
+  { key: 'physicalTouch', label: 'Comfortable Touch' },
+  { key: 'regularCommunication', label: 'Regular Check-ins' },
+  { key: 'firstKiss', label: 'First Kiss' },
+  { key: 'deepConversation', label: 'Real Vulnerability' },
+  { key: 'metCircle', label: 'Met Her Circle' },
+  { key: 'exclusive', label: 'Defined Relationship' },
+];
+
+const getStageLabel = (count: number): string => {
+  if (count === 0) return 'New Contact';
+  if (count <= 2) return 'Getting To Know';
+  if (count <= 4) return 'Dating';
+  if (count <= 6) return 'Deepening';
+  return 'Committed Relationship';
+};
+
+const DatesScreen: React.FC = () => {
+  const [connections, setConnections] = useState<DateConnection[]>(loadDateConnections);
+  const [showForm, setShowForm] = useState(false);
+  const [name, setName] = useState('');
+  const [metWhere, setMetWhere] = useState('');
+  const [metDate, setMetDate] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const resetForm = () => {
+    setName(''); setMetWhere(''); setMetDate(''); setNotes('');
+    setShowForm(false);
+  };
+
+  const handleCreate = () => {
+    if (!name.trim()) return;
+    const newConnection: DateConnection = {
+      id: Date.now().toString(),
+      name: name.trim(),
+      metWhere: metWhere.trim(),
+      metDate: metDate || new Date().toLocaleDateString('en-CA'),
+      notes: notes.trim(),
+      milestones: getDefaultMilestones(),
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [newConnection, ...connections];
+    setConnections(updated);
+    saveDateConnections(updated);
+    resetForm();
+  };
+
+  const handleDelete = (id: string) => {
+    const updated = connections.filter(c => c.id !== id);
+    setConnections(updated);
+    saveDateConnections(updated);
+  };
+
+  const toggleMilestone = (id: string, key: keyof DateMilestones) => {
+    const updated = connections.map(c => c.id === id ? { ...c, milestones: { ...c.milestones, [key]: !c.milestones[key] } } : c);
+    setConnections(updated);
+    saveDateConnections(updated);
+  };
+
+  return (
+    <div className="space-y-4 pb-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-black text-white uppercase tracking-tight">Dates</h2>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center space-x-1.5 px-3 py-1.5 bg-gold text-black text-xs font-bold rounded-xl hover:bg-gold/90 transition active:scale-95"
+        >
+          <UserPlus size={14} />
+          <span>New Connection</span>
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="bg-dark-accent/60 border border-gold/20 rounded-2xl p-4 space-y-3">
+          <h3 className="text-sm font-black text-gold uppercase tracking-wider">Log Connection</h3>
+          <input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Name"
+            className="w-full px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:border-gold focus:outline-none"
+          />
+          <input
+            value={metWhere}
+            onChange={e => setMetWhere(e.target.value)}
+            placeholder="Where you met (optional)"
+            className="w-full px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:border-gold focus:outline-none"
+          />
+          <input
+            type="date"
+            value={metDate}
+            onChange={e => setMetDate(e.target.value)}
+            className="w-full px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white text-sm focus:border-gold focus:outline-none"
+          />
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Notes (optional)"
+            rows={2}
+            className="w-full px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:border-gold focus:outline-none resize-none"
+          />
+          <div className="flex space-x-2 pt-1">
+            <button onClick={resetForm} className="flex-1 py-2.5 border border-white/10 rounded-xl text-white/50 text-sm font-bold hover:border-white/20 transition">
+              Cancel
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={!name.trim()}
+              className="flex-1 py-2.5 bg-gold text-black text-sm font-bold rounded-xl hover:bg-gold/90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+
+      {connections.length === 0 && !showForm && (
+        <div className="text-center py-16 space-y-3">
+          <Heart className="w-10 h-10 text-gold/30 mx-auto" />
+          <p className="text-white/30 text-sm">No connections yet.</p>
+          <p className="text-white/20 text-xs">Log someone you're seeing to track where things actually stand.</p>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {connections.map(conn => {
+          const count = MILESTONE_CONFIG.filter(m => conn.milestones[m.key]).length;
+          return (
+            <div key={conn.id} className="bg-dark-accent/40 border border-gold/20 rounded-2xl p-4 space-y-3">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="font-black text-sm text-white truncate">{conn.name}</p>
+                  <p className="text-white/40 text-[10px] mt-0.5">
+                    {conn.metWhere && `${conn.metWhere} · `}
+                    {new Date(conn.metDate + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                  {conn.notes && <p className="text-white/40 text-xs mt-1 line-clamp-2">{conn.notes}</p>}
+                </div>
+                <button onClick={() => handleDelete(conn.id)} className="ml-2 p-1 text-white/20 hover:text-red-400 transition flex-shrink-0">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="flex items-center space-x-1 px-2 py-0.5 bg-gold/10 border border-gold/20 rounded-full text-[10px] font-bold text-gold/80">
+                  <Sparkles size={10} />
+                  <span>{getStageLabel(count)}</span>
+                </span>
+                <span className="text-[10px] font-bold text-gold/60">{count}/{MILESTONE_CONFIG.length}</span>
+              </div>
+              <div className="w-full h-1 bg-black rounded-full overflow-hidden border border-white/5">
+                <div className="h-full bg-gold transition-all duration-500" style={{ width: `${(count / MILESTONE_CONFIG.length) * 100}%` }} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {MILESTONE_CONFIG.map(m => {
+                  const checked = conn.milestones[m.key];
+                  return (
+                    <button
+                      key={m.key}
+                      onClick={() => toggleMilestone(conn.id, m.key)}
+                      className={`flex items-center space-x-2 py-2 px-2.5 rounded-xl border text-left transition ${checked ? 'bg-gold/10 border-gold/40' : 'bg-black/30 border-white/5'}`}
+                    >
+                      {checked ? <CheckSquare size={16} className="text-gold flex-shrink-0" /> : <Square size={16} className="text-white/25 flex-shrink-0" />}
+                      <span className={`text-[10px] font-bold ${checked ? 'text-gold' : 'text-white/40'}`}>{m.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const getBoxStyles = (passes: number, isFocus?: boolean) => {
   if (isFocus) return { backgroundColor: 'rgba(59, 130, 246, 0.4)', border: '1px solid rgba(59, 130, 246, 0.6)', color: '#fff' };
   if (passes === 0) return { backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.05)' };
@@ -708,6 +909,7 @@ const BaseHub: React.FC<{
   const [ignitionOpen, setIgnitionOpen] = useState(false);
   const [ignitionStage, setIgnitionStage] = useState<IgnitionStage>('countdown');
   const [ignitionCount, setIgnitionCount] = useState(5);
+  const [ignitionWithFriends, setIgnitionWithFriends] = useState(false);
   const [goldenFlash, setGoldenFlash] = useState(false);
 
   useEffect(() => {
@@ -720,6 +922,7 @@ const BaseHub: React.FC<{
   const openIgnition = () => {
     setIgnitionCount(5);
     setIgnitionStage('countdown');
+    setIgnitionWithFriends(false);
     setIgnitionOpen(true);
   };
 
@@ -812,14 +1015,18 @@ const BaseHub: React.FC<{
             )}
             {ignitionStage === 'friends' && (
               <>
-                <h3 className="text-2xl font-black italic uppercase text-white tracking-tighter">Were Friends With You?</h3>
+                <h3 className="text-2xl font-black italic uppercase text-white tracking-tighter">Log The Approach</h3>
                 <p className="text-white/40 text-xs max-w-xs">Approaching with friends watching is worth bonus credit &mdash; it's harder.</p>
-                <div className="flex flex-col w-full space-y-3 pt-2">
-                  <button onClick={() => finalizeIgnitionApproach(true)} className="w-full py-4 bg-gold text-black font-black uppercase tracking-widest text-xs rounded-2xl shadow-lg flex items-center justify-center space-x-2">
-                    <span>🏆</span><span>Yes &mdash; Golden Approach</span>
-                  </button>
-                  <button onClick={() => finalizeIgnitionApproach(false)} className="w-full py-4 bg-white/5 text-white/50 font-black uppercase text-xs rounded-2xl border border-white/10">No, Solo</button>
-                </div>
+                <button
+                  onClick={() => setIgnitionWithFriends(f => !f)}
+                  className="w-full flex items-center space-x-3 py-4 px-4 rounded-2xl border border-white/10 bg-white/5 text-left"
+                >
+                  {ignitionWithFriends ? <CheckSquare size={22} className="text-gold flex-shrink-0" /> : <Square size={22} className="text-white/30 flex-shrink-0" />}
+                  <span className={`text-xs font-black uppercase tracking-widest ${ignitionWithFriends ? 'text-gold' : 'text-white/50'}`}>Friends were with me {ignitionWithFriends && '🏆'}</span>
+                </button>
+                <button onClick={() => finalizeIgnitionApproach(ignitionWithFriends)} className="w-full py-4 bg-gold text-black font-black uppercase tracking-widest text-xs rounded-2xl shadow-lg">
+                  Confirm Log
+                </button>
               </>
             )}
           </div>
@@ -845,10 +1052,10 @@ const BaseHub: React.FC<{
                 <p className="text-xs text-gray-400 font-medium">Log field interaction (Target: {selectedRating}/10)? Be truthful for growth.</p>
                 <button
                   onClick={() => setHonorWithFriends(f => !f)}
-                  className={`w-full flex items-center justify-center space-x-2 py-3 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition ${honorWithFriends ? 'bg-gold/20 border-gold text-gold' : 'bg-black/30 border-white/10 text-white/40'}`}
+                  className={`w-full flex items-center space-x-3 py-3 px-4 rounded-2xl border text-left transition ${honorWithFriends ? 'bg-gold/20 border-gold' : 'bg-black/30 border-white/10'}`}
                 >
-                  <span>{honorWithFriends ? '🏆' : '👤'}</span>
-                  <span>{honorWithFriends ? 'With Friends (Golden)' : 'Mark: Approached With Friends'}</span>
+                  {honorWithFriends ? <CheckSquare size={20} className="text-gold flex-shrink-0" /> : <Square size={20} className="text-white/30 flex-shrink-0" />}
+                  <span className={`text-[11px] font-black uppercase tracking-widest ${honorWithFriends ? 'text-gold' : 'text-white/40'}`}>Friends were with me {honorWithFriends && '🏆'}</span>
                 </button>
                 <div className="flex flex-col w-full space-y-3 pt-2">
                    <button onClick={() => { onVerifySuccess(true, honorWithFriends); if (honorWithFriends) { setGoldenFlash(true); setTimeout(() => setGoldenFlash(false), 2500); } setShowHonorCodeConfirm(false); setHonorWithFriends(false); }} className="w-full py-4 bg-gold text-black font-black uppercase tracking-widest text-xs rounded-2xl">Confirm Log</button>

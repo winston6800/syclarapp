@@ -56,7 +56,8 @@ export enum AppScreen {
   DASHBOARD = 'DASHBOARD',
   ACHIEVEMENTS = 'ACHIEVEMENTS',
   BREATHE = 'BREATHE',
-  EVENTS = 'EVENTS'
+  EVENTS = 'EVENTS',
+  DATES = 'DATES'
 }
 
 export type EventEnvironment = 'indoor' | 'outdoor' | 'online' | 'any';
@@ -71,4 +72,25 @@ export interface SocialEvent {
   time: string;
   createdAt: string;
   completed?: boolean;
+}
+
+export interface DateMilestones {
+  gotContact: boolean;
+  firstDate: boolean;
+  physicalTouch: boolean;
+  firstKiss: boolean;
+  regularCommunication: boolean;
+  metCircle: boolean;
+  deepConversation: boolean;
+  exclusive: boolean;
+}
+
+export interface DateConnection {
+  id: string;
+  name: string;
+  metWhere: string;
+  metDate: string;
+  notes: string;
+  milestones: DateMilestones;
+  createdAt: string;
 }
