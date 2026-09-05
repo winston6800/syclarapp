@@ -2,9 +2,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Layout from './components/Layout';
 import { AppScreen, Achievement, UserState, Difficulty, UserStats, Location } from './types';
-import { verifyApproachScreenshot } from './services/geminiService';
 import { useUserData } from './hooks/useUserData';
-import { Trophy, Zap, AlertCircle, CheckCircle2, Play, RefreshCw, X, Flame, Calendar, Award, MapPin, Clock, ShieldCheck, Target, Camera, Loader2, UserCheck, Map as MapIcon, Home as HomeIcon, Settings, Terminal, Plus, Minus, UserMinus, Crosshair, Navigation, Eye, EyeOff, CheckCircle, Trash2, FastForward, Dice5, Coffee, ZapOff, ChevronRight, ChevronDown, ChevronLeft, Briefcase, History, BarChart3, Check, Quote, Star, Filter, CalendarPlus, Sun, Cloud, Wifi, Globe, Edit2, Heart, Square, CheckSquare, UserPlus, Sparkles } from 'lucide-react';
+import { Trophy, Zap, AlertCircle, CheckCircle2, Play, RefreshCw, X, Flame, Calendar, Award, MapPin, Clock, ShieldCheck, Target, Map as MapIcon, Home as HomeIcon, Settings, Terminal, Plus, Minus, UserMinus, Crosshair, Navigation, Eye, EyeOff, CheckCircle, Trash2, FastForward, Dice5, Coffee, ZapOff, ChevronRight, ChevronDown, ChevronLeft, Briefcase, History, BarChart3, Check, Quote, Star, Filter, CalendarPlus, Sun, Cloud, Wifi, Globe, Edit2, Heart, Square, CheckSquare, UserPlus, Sparkles } from 'lucide-react';
 import { SocialEvent, EventEnvironment, DateConnection, DateMilestones } from './types';
 
 /**
@@ -896,13 +895,10 @@ const BaseHub: React.FC<{
   onUpdateThreshold: () => void,
   onLogIgnition: (seized: boolean) => void
 }> = ({ userState, isDayCompleted, onVerifySuccess, onUpdatePassedBy, onToggleBreak, onUpdateThreshold, onLogIgnition }) => {
-  const [verifying, setVerifying] = useState(false);
-  const [lastVerifiedName, setLastVerifiedName] = useState<string | null>(null);
   const [showHonorCodeConfirm, setShowHonorCodeConfirm] = useState(false);
   const [honorWithFriends, setHonorWithFriends] = useState(false);
   const [showBreakConfirm, setShowBreakConfirm] = useState(false);
   const [selectedRating, setSelectedRating] = useState(5);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Ignition Mode: a forced 5-second countdown the instant you spot her, so the
   // decision gets made before the hesitation loop has time to talk you out of it.
@@ -941,24 +937,6 @@ const BaseHub: React.FC<{
       setTimeout(() => setGoldenFlash(false), 2500);
     }
     closeIgnition();
-  };
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setVerifying(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = (event.target?.result as string).split(',')[1];
-      const result = await verifyApproachScreenshot(base64);
-      if (result.verified) { 
-        setLastVerifiedName(result.contactName); 
-        onVerifySuccess(false); 
-      }
-      setVerifying(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-    reader.readAsDataURL(file);
   };
 
   const gridData = useMemo(() => {
@@ -1212,13 +1190,10 @@ const BaseHub: React.FC<{
         </div>
 
         <div className="flex flex-col space-y-3 pt-2">
-          <button className={`w-full py-4 rounded-xl font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-2 ${verifying ? 'bg-black text-gold border-2 border-gold' : 'bg-gold text-black shadow-lg'}`} onClick={() => !verifying && fileInputRef.current?.click()} disabled={verifying || userState.isOnBreak}>
-            {verifying ? <Loader2 size={20} className="animate-spin" /> : <Camera size={20} />}<span>{verifying ? 'Verifying Contact...' : 'Log Success'}</span>
+          <button className="w-full py-4 rounded-xl font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-2 bg-gold text-black shadow-lg disabled:opacity-50" disabled={userState.isOnBreak} onClick={() => setShowHonorCodeConfirm(true)}>
+            <ShieldCheck size={20} /><span>Honor Code Log</span>
           </button>
-          <button className={`w-full py-4 rounded-xl font-black uppercase tracking-widest border transition-all flex items-center justify-center space-x-2 bg-black text-gold border-gold/50 ${userState.isOnBreak ? 'opacity-50' : ''}`} disabled={userState.isOnBreak} onClick={() => setShowHonorCodeConfirm(true)}><ShieldCheck size={20} /><span>Honor Code Log</span></button>
         </div>
-        {lastVerifiedName && <div className="p-3 bg-gold/10 border border-gold/40 rounded-xl text-gold text-[11px] font-black flex items-center justify-center space-x-2"><UserCheck size={16} /><span>Verified {lastVerifiedName}</span></div>}
-        <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
       </div>
 
       <div className="pt-4 flex justify-center">
