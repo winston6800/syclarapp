@@ -13,7 +13,8 @@ export interface Achievement {
   unlocked: boolean;
   progress: number;
   target: number;
-  category: 'CONSISTENCY' | 'RESILIENCE' | 'STAMINA' | 'DIVERSITY';
+  category: 'CONSISTENCY' | 'RESILIENCE' | 'STAMINA' | 'DIVERSITY' | 'PURPOSE';
+  tier?: 'gold';
 }
 
 export interface UserStats {
@@ -23,6 +24,10 @@ export interface UserStats {
   morningInteractions: number;
   totalApproaches: number;
   totalPassedBy: number;
+  windowsSeized: number;
+  windowsFrozen: number;
+  plannedOutingsCompleted: number;
+  approachesWithFriends: number;
 }
 
 export interface Location {
@@ -65,4 +70,5 @@ export interface SocialEvent {
   date: string;
   time: string;
   createdAt: string;
+  completed?: boolean;
 }

@@ -123,7 +123,7 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userState?.dailyPasses, dataLoading]);
 
-  const handleVerifySuccess = (isRejection: boolean = false, customDate?: string) => {
+  const handleVerifySuccess = (isRejection: boolean = false, withFriends: boolean = false, customDate?: string) => {
     const today = customDate || new Date().toLocaleDateString('en-CA');
     const isMorning = new Date().getHours() < 10;
 
@@ -132,7 +132,7 @@ const App: React.FC = () => {
       const newDates = isAlreadyLoggedToday ? prev.approachDates : [...prev.approachDates, today];
       const newDailyApproaches = { ...prev.dailyApproaches };
       newDailyApproaches[today] = (newDailyApproaches[today] || 0) + 1;
-      
+
       const newBusinessFocus = { ...prev.dailyBusinessFocus };
       newBusinessFocus[today] = false;
 
@@ -142,15 +142,18 @@ const App: React.FC = () => {
       newStats.totalApproaches += 1;
       if (isRejection) newStats.rejectionResilience += 1;
       if (isMorning) newStats.morningInteractions += 1;
+      if (withFriends) newStats.approachesWithFriends += 1;
 
       const newAchievements = prev.achievements.map(ach => {
         let newProgress = ach.progress;
         if (ach.id.startsWith('streak-')) {
           newProgress = Math.max(ach.progress, currentStreak);
-        } else if (ach.id === 'vol-100') {
+        } else if (ach.id === 'vol-100' || ach.id === 'approaches-10' || ach.id === 'approaches-50') {
           newProgress = newStats.totalApproaches;
         } else if (ach.id === 'morning-20') {
           newProgress = newStats.morningInteractions;
+        } else if (ach.id === 'golden-approach') {
+          newProgress = newStats.approachesWithFriends;
         }
         const unlocked = newProgress >= ach.target;
         return { ...ach, progress: newProgress, unlocked };
@@ -167,6 +170,40 @@ const App: React.FC = () => {
         currentPassedBy: 0,
         isOnBreak: false
       };
+    });
+  };
+
+  // Ignition Mode: log whether an approach window was seized or frozen on.
+  const logIgnitionWindow = (seized: boolean) => {
+    setUserState(prev => {
+      const newStats = { ...prev.stats };
+      if (seized) newStats.windowsSeized += 1;
+      else newStats.windowsFrozen += 1;
+
+      const newAchievements = prev.achievements.map(ach => {
+        if (ach.id === 'ignition-10') {
+          const newProgress = newStats.windowsSeized;
+          return { ...ach, progress: newProgress, unlocked: newProgress >= ach.target };
+        }
+        return ach;
+      });
+
+      return { ...prev, stats: newStats, achievements: newAchievements };
+    });
+  };
+
+  // Purpose track: a planned outing (Events tab) was actually carried out.
+  const markOutingCompleted = () => {
+    setUserState(prev => {
+      const newStats = { ...prev.stats, plannedOutingsCompleted: prev.stats.plannedOutingsCompleted + 1 };
+      const newAchievements = prev.achievements.map(ach => {
+        if (ach.id === 'purpose-1' || ach.id === 'purpose-5') {
+          const newProgress = newStats.plannedOutingsCompleted;
+          return { ...ach, progress: newProgress, unlocked: newProgress >= ach.target };
+        }
+        return ach;
+      });
+      return { ...prev, stats: newStats, achievements: newAchievements };
     });
   };
 
@@ -320,23 +357,24 @@ const App: React.FC = () => {
     <Layout activeScreen={screen} onNavigate={setScreen}>
       <div className="relative min-h-full">
         {screen === AppScreen.BASE && (
-          <BaseHub 
-            userState={userState} 
+          <BaseHub
+            userState={userState}
             isDayCompleted={isDayCompleted}
             onVerifySuccess={handleVerifySuccess}
             onUpdatePassedBy={updatePassedBy}
             onToggleBreak={toggleBreakMode}
             onUpdateThreshold={updateMinThreshold}
+            onLogIgnition={logIgnitionWindow}
           />
         )}
         {screen === AppScreen.ACHIEVEMENTS && (
-          <AchievementsDashboard 
-            userState={userState} 
-            achievements={userState.achievements} 
+          <AchievementsDashboard
+            userState={userState}
+            achievements={userState.achievements}
           />
         )}
         {screen === AppScreen.BREATHE && <BreatheModule />}
-        {screen === AppScreen.EVENTS && <EventsScreen />}
+        {screen === AppScreen.EVENTS && <EventsScreen onOutingCompleted={markOutingCompleted} />}
 
         <div className="fixed bottom-24 right-4 z-50">
           <button onClick={() => setDevMenuOpen(!devMenuOpen)} className="w-10 h-10 bg-gold/20 backdrop-blur-md border border-gold/30 rounded-full flex items-center justify-center text-gold hover:bg-gold/40 shadow-lg transition-transform active:scale-90">
@@ -385,7 +423,7 @@ const saveEvents = (events: SocialEvent[]) => {
   localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
 };
 
-const EventsScreen: React.FC = () => {
+const EventsScreen: React.FC<{ onOutingCompleted: () => void }> = ({ onOutingCompleted }) => {
   const [events, setEvents] = useState<SocialEvent[]>(loadEvents);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
@@ -423,6 +461,13 @@ const EventsScreen: React.FC = () => {
     const updated = events.filter(e => e.id !== id);
     setEvents(updated);
     saveEvents(updated);
+  };
+
+  const handleComplete = (id: string) => {
+    const updated = events.map(e => e.id === id ? { ...e, completed: true } : e);
+    setEvents(updated);
+    saveEvents(updated);
+    onOutingCompleted();
   };
 
   const upcoming = events.filter(e => e.date >= new Date().toLocaleDateString('en-CA')).sort((a, b) => a.date.localeCompare(b.date));
@@ -516,14 +561,14 @@ const EventsScreen: React.FC = () => {
       {upcoming.length > 0 && (
         <div className="space-y-2">
           <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Upcoming</p>
-          {upcoming.map(event => <EventCard key={event.id} event={event} onDelete={handleDelete} />)}
+          {upcoming.map(event => <EventCard key={event.id} event={event} onDelete={handleDelete} onComplete={handleComplete} />)}
         </div>
       )}
 
       {past.length > 0 && (
         <div className="space-y-2">
           <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mt-4">Past</p>
-          {past.map(event => <EventCard key={event.id} event={event} onDelete={handleDelete} past />)}
+          {past.map(event => <EventCard key={event.id} event={event} onDelete={handleDelete} onComplete={handleComplete} past />)}
         </div>
       )}
 
@@ -545,11 +590,11 @@ const ENV_ICON: Record<EventEnvironment, React.ReactNode> = {
   online:  <Wifi size={11} />,
 };
 
-const EventCard: React.FC<{ event: SocialEvent; onDelete: (id: string) => void; past?: boolean }> = ({ event, onDelete, past }) => (
-  <div className={`bg-dark-accent/40 border rounded-2xl p-4 space-y-2 ${past ? 'border-white/5 opacity-60' : 'border-gold/20'}`}>
+const EventCard: React.FC<{ event: SocialEvent; onDelete: (id: string) => void; onComplete: (id: string) => void; past?: boolean }> = ({ event, onDelete, onComplete, past }) => (
+  <div className={`bg-dark-accent/40 border rounded-2xl p-4 space-y-2 ${event.completed ? 'border-gold/40' : past ? 'border-white/5 opacity-60' : 'border-gold/20'}`}>
     <div className="flex items-start justify-between">
       <div className="flex-1 min-w-0">
-        <p className={`font-black text-sm truncate ${past ? 'text-white/50' : 'text-white'}`}>{event.title}</p>
+        <p className={`font-black text-sm truncate ${past && !event.completed ? 'text-white/50' : 'text-white'}`}>{event.title}</p>
         {event.description && <p className="text-white/40 text-xs mt-0.5 line-clamp-2">{event.description}</p>}
       </div>
       <button onClick={() => onDelete(event.id)} className="ml-2 p-1 text-white/20 hover:text-red-400 transition flex-shrink-0">
@@ -574,6 +619,21 @@ const EventCard: React.FC<{ event: SocialEvent; onDelete: (id: string) => void; 
         </span>
       )}
     </div>
+
+    {event.completed ? (
+      <div className="flex items-center space-x-1.5 px-3 py-1.5 bg-gold/10 border border-gold/30 rounded-xl text-[10px] font-black uppercase tracking-widest text-gold w-fit">
+        <CheckCircle size={12} />
+        <span>Purpose Fulfilled</span>
+      </div>
+    ) : (
+      <button
+        onClick={() => onComplete(event.id)}
+        className="flex items-center space-x-1.5 px-3 py-1.5 bg-black/40 border border-gold/20 rounded-xl text-[10px] font-black uppercase tracking-widest text-gold/70 hover:border-gold hover:text-gold transition w-fit"
+      >
+        <Check size={12} />
+        <span>Mark Done</span>
+      </button>
+    )}
   </div>
 );
 
@@ -624,20 +684,61 @@ const FrequencyMap: React.FC<{ data: { date: string, passes: number, isFocus: bo
   </div>
 );
 
-const BaseHub: React.FC<{ 
-  userState: UserState, 
-  isDayCompleted: boolean, 
-  onVerifySuccess: (isRejection?: boolean) => void,
+type IgnitionStage = 'countdown' | 'result' | 'friends';
+
+const BaseHub: React.FC<{
+  userState: UserState,
+  isDayCompleted: boolean,
+  onVerifySuccess: (isRejection?: boolean, withFriends?: boolean) => void,
   onUpdatePassedBy: (delta: number) => void,
   onToggleBreak: (active: boolean) => void,
-  onUpdateThreshold: () => void
-}> = ({ userState, isDayCompleted, onVerifySuccess, onUpdatePassedBy, onToggleBreak, onUpdateThreshold }) => {
+  onUpdateThreshold: () => void,
+  onLogIgnition: (seized: boolean) => void
+}> = ({ userState, isDayCompleted, onVerifySuccess, onUpdatePassedBy, onToggleBreak, onUpdateThreshold, onLogIgnition }) => {
   const [verifying, setVerifying] = useState(false);
   const [lastVerifiedName, setLastVerifiedName] = useState<string | null>(null);
   const [showHonorCodeConfirm, setShowHonorCodeConfirm] = useState(false);
+  const [honorWithFriends, setHonorWithFriends] = useState(false);
   const [showBreakConfirm, setShowBreakConfirm] = useState(false);
   const [selectedRating, setSelectedRating] = useState(5);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Ignition Mode: a forced 5-second countdown the instant you spot her, so the
+  // decision gets made before the hesitation loop has time to talk you out of it.
+  const [ignitionOpen, setIgnitionOpen] = useState(false);
+  const [ignitionStage, setIgnitionStage] = useState<IgnitionStage>('countdown');
+  const [ignitionCount, setIgnitionCount] = useState(5);
+  const [goldenFlash, setGoldenFlash] = useState(false);
+
+  useEffect(() => {
+    if (!ignitionOpen || ignitionStage !== 'countdown') return;
+    if (ignitionCount <= 0) { setIgnitionStage('result'); return; }
+    const t = setTimeout(() => setIgnitionCount(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [ignitionOpen, ignitionStage, ignitionCount]);
+
+  const openIgnition = () => {
+    setIgnitionCount(5);
+    setIgnitionStage('countdown');
+    setIgnitionOpen(true);
+  };
+
+  const closeIgnition = () => setIgnitionOpen(false);
+
+  const handleFroze = () => {
+    onLogIgnition(false);
+    closeIgnition();
+  };
+
+  const finalizeIgnitionApproach = (withFriends: boolean) => {
+    onLogIgnition(true);
+    onVerifySuccess(true, withFriends);
+    if (withFriends) {
+      setGoldenFlash(true);
+      setTimeout(() => setGoldenFlash(false), 2500);
+    }
+    closeIgnition();
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -681,6 +782,60 @@ const BaseHub: React.FC<{
   return (
     <div className="space-y-6 animate-in fade-in duration-700 pb-20">
       {/* Modals */}
+      {ignitionOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/95 backdrop-blur-md">
+          {ignitionStage === 'countdown' && (
+            <button onClick={handleFroze} className="absolute top-6 right-6 p-2 text-white/30 hover:text-white/60 transition">
+              <X size={22} />
+            </button>
+          )}
+          <div className="relative flex flex-col items-center text-center space-y-8 animate-in zoom-in-95">
+            {ignitionStage === 'countdown' && (
+              <>
+                <p className="text-gold text-xs font-black uppercase tracking-[0.3em]">Window Open</p>
+                <div className="w-48 h-48 rounded-full border-4 border-gold flex items-center justify-center shadow-[0_0_60px_rgba(212,175,55,0.5)] animate-pulse">
+                  <span className="text-8xl font-black italic text-gold tabular-nums">{ignitionCount}</span>
+                </div>
+                <h3 className="text-2xl font-black italic uppercase text-white tracking-tighter">Move. Don't Think.</h3>
+                <p className="text-white/40 text-xs max-w-xs">Walk toward her before the countdown ends. Freezing is a choice you're about to make automatically &mdash; don't let it.</p>
+              </>
+            )}
+            {ignitionStage === 'result' && (
+              <>
+                <h3 className="text-2xl font-black italic uppercase text-white tracking-tighter">Did You Move?</h3>
+                <p className="text-white/40 text-xs max-w-xs">Be honest. This is how you actually fix the freeze.</p>
+                <div className="flex flex-col w-full space-y-3 pt-2">
+                  <button onClick={() => setIgnitionStage('friends')} className="w-full py-4 bg-gold text-black font-black uppercase tracking-widest text-xs rounded-2xl shadow-lg">✅ I Walked Up</button>
+                  <button onClick={handleFroze} className="w-full py-4 bg-white/5 text-white/50 font-black uppercase text-xs rounded-2xl border border-white/10">😬 I Froze</button>
+                </div>
+              </>
+            )}
+            {ignitionStage === 'friends' && (
+              <>
+                <h3 className="text-2xl font-black italic uppercase text-white tracking-tighter">Were Friends With You?</h3>
+                <p className="text-white/40 text-xs max-w-xs">Approaching with friends watching is worth bonus credit &mdash; it's harder.</p>
+                <div className="flex flex-col w-full space-y-3 pt-2">
+                  <button onClick={() => finalizeIgnitionApproach(true)} className="w-full py-4 bg-gold text-black font-black uppercase tracking-widest text-xs rounded-2xl shadow-lg flex items-center justify-center space-x-2">
+                    <span>🏆</span><span>Yes &mdash; Golden Approach</span>
+                  </button>
+                  <button onClick={() => finalizeIgnitionApproach(false)} className="w-full py-4 bg-white/5 text-white/50 font-black uppercase text-xs rounded-2xl border border-white/10">No, Solo</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {goldenFlash && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center pointer-events-none p-6">
+          <div className="bg-gradient-to-br from-gold via-yellow-400 to-gold text-black px-8 py-6 rounded-3xl shadow-2xl text-center space-y-1 animate-in zoom-in-95">
+            <p className="text-3xl">🏆</p>
+            <p className="font-black uppercase italic tracking-tighter text-lg">Golden Approach</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">Bonus credit for doing it in front of friends</p>
+          </div>
+        </div>
+      )}
+
       {showHonorCodeConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
           <div className="relative bg-dark-card border border-gold/40 p-8 rounded-[40px] shadow-2xl animate-in zoom-in-95">
@@ -688,9 +843,16 @@ const BaseHub: React.FC<{
                 <div className="p-4 rounded-full bg-gold/10 border border-gold/20 text-gold"><ShieldCheck size={40} /></div>
                 <h3 className="text-xl font-black italic uppercase text-white">Honor Protocol</h3>
                 <p className="text-xs text-gray-400 font-medium">Log field interaction (Target: {selectedRating}/10)? Be truthful for growth.</p>
+                <button
+                  onClick={() => setHonorWithFriends(f => !f)}
+                  className={`w-full flex items-center justify-center space-x-2 py-3 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition ${honorWithFriends ? 'bg-gold/20 border-gold text-gold' : 'bg-black/30 border-white/10 text-white/40'}`}
+                >
+                  <span>{honorWithFriends ? '🏆' : '👤'}</span>
+                  <span>{honorWithFriends ? 'With Friends (Golden)' : 'Mark: Approached With Friends'}</span>
+                </button>
                 <div className="flex flex-col w-full space-y-3 pt-2">
-                   <button onClick={() => { onVerifySuccess(true); setShowHonorCodeConfirm(false); }} className="w-full py-4 bg-gold text-black font-black uppercase tracking-widest text-xs rounded-2xl">Confirm Log</button>
-                   <button onClick={() => setShowHonorCodeConfirm(false)} className="w-full py-4 bg-white/5 text-white/40 font-black uppercase text-[10px] rounded-2xl">Abort</button>
+                   <button onClick={() => { onVerifySuccess(true, honorWithFriends); if (honorWithFriends) { setGoldenFlash(true); setTimeout(() => setGoldenFlash(false), 2500); } setShowHonorCodeConfirm(false); setHonorWithFriends(false); }} className="w-full py-4 bg-gold text-black font-black uppercase tracking-widest text-xs rounded-2xl">Confirm Log</button>
+                   <button onClick={() => { setShowHonorCodeConfirm(false); setHonorWithFriends(false); }} className="w-full py-4 bg-white/5 text-white/40 font-black uppercase text-[10px] rounded-2xl">Abort</button>
                 </div>
              </div>
           </div>
@@ -733,6 +895,20 @@ const BaseHub: React.FC<{
       </div>
 
       <HeadlineRoller />
+
+      {/* Ignition Mode: the in-the-moment trigger for when you spot her right now */}
+      <button
+        onClick={openIgnition}
+        className="w-full py-5 rounded-3xl font-black uppercase tracking-widest text-sm bg-gradient-to-r from-gold via-yellow-400 to-gold text-black shadow-[0_0_30px_rgba(212,175,55,0.35)] flex items-center justify-center space-x-3 active:scale-[0.98] transition-transform"
+      >
+        <Zap size={22} className="fill-black" />
+        <span>She's Here &mdash; Ignite</span>
+      </button>
+      {(userState.stats.windowsSeized > 0 || userState.stats.windowsFrozen > 0) && (
+        <p className="text-center text-[9px] font-bold uppercase tracking-widest text-gray-500 -mt-3">
+          Windows Seized: <span className="text-gold">{userState.stats.windowsSeized}</span> · Frozen: <span className="text-gray-400">{userState.stats.windowsFrozen}</span>
+        </p>
+      )}
 
       <div className="bg-dark-card border border-gold/10 rounded-[32px] p-6 shadow-xl relative overflow-hidden">
         <div className="absolute top-4 left-4 z-20 w-16 h-16 bg-gold rounded-2xl flex flex-col items-center justify-center shadow-xl border-2 border-white/20">
@@ -1019,22 +1195,32 @@ const AchievementsDashboard: React.FC<{ userState: UserState, achievements: Achi
         <MetricCard icon={<ShieldCheck className="text-gold" size={18} />} label="Retention" value={userState.streak} desc="Day Streak" />
         <MetricCard icon={<Target className="text-gold" size={18} />} label="Resistance" value={stats.totalPassedBy} desc="Total Pass-By" />
         <MetricCard icon={<MapPin className="text-gold" size={18} />} label="Volume" value={stats.totalApproaches} desc="Total Actions" />
+        <MetricCard icon={<Zap className="text-gold" size={18} />} label="Ignition" value={`${stats.windowsSeized}/${stats.windowsSeized + stats.windowsFrozen}`} desc="Windows Seized" />
+        <MetricCard icon={<Trophy className="text-gold" size={18} />} label="Purpose" value={stats.plannedOutingsCompleted} desc="Outings Completed" />
       </div>
 
       <div className="space-y-3">
         <h3 className="text-gold font-black text-xs uppercase px-1 tracking-widest">Retention Milestones</h3>
-        {achievements.map(ach => (
-          <div key={ach.id} className={`p-4 rounded-2xl border transition-all ${ach.unlocked ? 'bg-dark-card border-gold/40 shadow-lg' : 'bg-black/40 border-white/5 opacity-60'}`}>
-            <div className="flex items-center space-x-4">
-              <div className={`text-3xl w-14 h-14 flex items-center justify-center rounded-full bg-black border ${ach.unlocked ? 'border-gold shadow-md' : 'border-gray-800'}`}>{ach.icon}</div>
-              <div className="flex-1">
-                <div className="flex justify-between items-center mb-1"><h4 className="font-black text-white uppercase text-sm italic">{ach.title}</h4><span className="text-[10px] font-bold text-gold/60">{ach.progress}/{ach.target}</span></div>
-                <p className="text-[10px] text-gray-400 font-medium mb-2">{ach.description}</p>
-                <div className="w-full h-1 bg-black rounded-full overflow-hidden border border-white/5"><div className={`h-full transition-all duration-1000 ${ach.unlocked ? 'bg-gold' : 'bg-gray-800'}`} style={{ width: `${Math.min(100, (ach.progress / ach.target) * 100)}%` }}></div></div>
+        {achievements.map(ach => {
+          const isGolden = ach.tier === 'gold';
+          return (
+            <div key={ach.id} className={`relative p-4 rounded-2xl border transition-all overflow-hidden ${
+              isGolden
+                ? (ach.unlocked ? 'bg-gradient-to-br from-yellow-900/40 via-dark-card to-black border-2 border-gold shadow-[0_0_25px_rgba(212,175,55,0.5)]' : 'bg-black/40 border-2 border-gold/30 opacity-70')
+                : (ach.unlocked ? 'bg-dark-card border-gold/40 shadow-lg' : 'bg-black/40 border-white/5 opacity-60')
+            }`}>
+              {isGolden && <div className="absolute top-0 right-0 px-2 py-0.5 bg-gold text-black text-[8px] font-black uppercase tracking-widest rounded-bl-lg">Golden</div>}
+              <div className="flex items-center space-x-4">
+                <div className={`text-3xl w-14 h-14 flex items-center justify-center rounded-full bg-black border ${ach.unlocked ? 'border-gold shadow-md' : 'border-gray-800'}`}>{ach.icon}</div>
+                <div className="flex-1">
+                  <div className="flex justify-between items-center mb-1"><h4 className="font-black text-white uppercase text-sm italic">{ach.title}</h4><span className="text-[10px] font-bold text-gold/60">{ach.progress}/{ach.target}</span></div>
+                  <p className="text-[10px] text-gray-400 font-medium mb-2">{ach.description}</p>
+                  <div className="w-full h-1 bg-black rounded-full overflow-hidden border border-white/5"><div className={`h-full transition-all duration-1000 ${ach.unlocked ? 'bg-gold' : 'bg-gray-800'}`} style={{ width: `${Math.min(100, (ach.progress / ach.target) * 100)}%` }}></div></div>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

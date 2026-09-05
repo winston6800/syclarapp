@@ -28,13 +28,21 @@ const getDefaultState = (): UserState => {
       uniqueLocations: 0,
       morningInteractions: 0,
       totalApproaches: 0,
-      totalPassedBy: 0
+      totalPassedBy: 0,
+      windowsSeized: 0,
+      windowsFrozen: 0,
+      plannedOutingsCompleted: 0,
+      approachesWithFriends: 0
     },
     achievements: [
       { id: 'streak-3', title: 'Momentum', description: '3-Day Streak', icon: '🔥', unlocked: false, progress: 0, target: 3, category: 'CONSISTENCY' },
       { id: 'streak-7', title: 'Unstoppable', description: '7-Day Streak', icon: '⚡', unlocked: false, progress: 0, target: 7, category: 'CONSISTENCY' },
       { id: 'approaches-10', title: 'Initiator', description: '10 Interactions', icon: '🎯', unlocked: false, progress: 0, target: 10, category: 'STAMINA' },
       { id: 'approaches-50', title: 'Social Dynamo', description: '50 Interactions', icon: '💪', unlocked: false, progress: 0, target: 50, category: 'STAMINA' },
+      { id: 'ignition-10', title: 'Ignition Reflex', description: 'Seize 10 approach windows before you can talk yourself out of it', icon: '⚡', unlocked: false, progress: 0, target: 10, category: 'RESILIENCE' },
+      { id: 'purpose-1', title: 'Purposeful', description: 'Plan and complete 1 deliberate outing', icon: '🧭', unlocked: false, progress: 0, target: 1, category: 'PURPOSE' },
+      { id: 'purpose-5', title: 'Architect', description: 'Plan and complete 5 deliberate outings', icon: '🗺️', unlocked: false, progress: 0, target: 5, category: 'PURPOSE' },
+      { id: 'golden-approach', title: 'Golden Approach', description: "Approach her while you're out with friends", icon: '🏆', unlocked: false, progress: 0, target: 1, category: 'PURPOSE', tier: 'gold' },
     ],
     homeLocation: null,
     currentPassedBy: 0,
