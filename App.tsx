@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Layout from './components/Layout';
 import { AppScreen, Achievement, UserState, Difficulty, UserStats, Location } from './types';
 import { useUserData } from './hooks/useUserData';
-import { Trophy, Zap, AlertCircle, CheckCircle2, Play, RefreshCw, X, Flame, Calendar, Award, MapPin, Clock, ShieldCheck, Target, Map as MapIcon, Home as HomeIcon, Settings, Terminal, Plus, Minus, UserMinus, Crosshair, Navigation, Eye, EyeOff, CheckCircle, Trash2, FastForward, Dice5, Coffee, ZapOff, ChevronRight, ChevronDown, ChevronLeft, Briefcase, History, BarChart3, Check, Quote, Star, Filter, CalendarPlus, Sun, Cloud, Wifi, Globe, Edit2, Heart, Square, CheckSquare, UserPlus, Sparkles } from 'lucide-react';
+import { Trophy, Zap, AlertCircle, CheckCircle2, Play, RefreshCw, X, Flame, Calendar, Award, MapPin, Clock, ShieldCheck, Target, Map as MapIcon, Home as HomeIcon, Settings, Terminal, Plus, Minus, UserMinus, Crosshair, Navigation, Eye, EyeOff, CheckCircle, Trash2, FastForward, Dice5, Coffee, ZapOff, ChevronRight, ChevronDown, ChevronLeft, Briefcase, History, BarChart3, Check, Quote, Star, Filter, CalendarPlus, Sun, Cloud, Wifi, Globe, Edit2, Heart, Square, CheckSquare, UserPlus, Sparkles, PartyPopper, Magnet } from 'lucide-react';
 import { SocialEvent, EventEnvironment, DateConnection, DateMilestones } from './types';
 
 /**
@@ -136,6 +136,9 @@ const App: React.FC = () => {
       const newBusinessFocus = { ...prev.dailyBusinessFocus };
       newBusinessFocus[today] = false;
 
+      const newGoldenApproaches = { ...prev.dailyGoldenApproaches };
+      if (withFriends) newGoldenApproaches[today] = true;
+
       const currentStreak = calculateCurrentStreak(newDates, newBusinessFocus);
 
       const newStats = { ...prev.stats };
@@ -164,6 +167,7 @@ const App: React.FC = () => {
         approachDates: newDates,
         dailyApproaches: newDailyApproaches,
         dailyBusinessFocus: newBusinessFocus,
+        dailyGoldenApproaches: newGoldenApproaches,
         streak: currentStreak,
         stats: newStats,
         achievements: newAchievements,
@@ -193,12 +197,20 @@ const App: React.FC = () => {
   };
 
   // Purpose track: a planned outing (Events tab) was actually carried out.
-  const markOutingCompleted = () => {
+  const markOutingCompleted = (bringsPeople: boolean = false) => {
     setUserState(prev => {
-      const newStats = { ...prev.stats, plannedOutingsCompleted: prev.stats.plannedOutingsCompleted + 1 };
+      const newStats = {
+        ...prev.stats,
+        plannedOutingsCompleted: prev.stats.plannedOutingsCompleted + 1,
+        groupOutingsCompleted: prev.stats.groupOutingsCompleted + (bringsPeople ? 1 : 0)
+      };
       const newAchievements = prev.achievements.map(ach => {
         if (ach.id === 'purpose-1' || ach.id === 'purpose-5') {
           const newProgress = newStats.plannedOutingsCompleted;
+          return { ...ach, progress: newProgress, unlocked: newProgress >= ach.target };
+        }
+        if (ach.id === 'social-magnet') {
+          const newProgress = newStats.groupOutingsCompleted;
           return { ...ach, progress: newProgress, unlocked: newProgress >= ach.target };
         }
         return ach;
@@ -424,33 +436,93 @@ const saveEvents = (events: SocialEvent[]) => {
   localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
 };
 
-const EventsScreen: React.FC<{ onOutingCompleted: () => void }> = ({ onOutingCompleted }) => {
+interface EventIdea {
+  title: string;
+  description: string;
+  environment: EventEnvironment;
+  bringsPeople: boolean;
+  icon: React.ReactNode;
+}
+
+const EVENT_IDEAS: EventIdea[] = [
+  { title: 'House Party', description: 'Host a small get-together, tell people to bring a friend.', environment: 'indoor', bringsPeople: true, icon: <PartyPopper size={16} /> },
+  { title: 'Group Hike', description: 'Organize a hike and open it up to friends-of-friends.', environment: 'outdoor', bringsPeople: true, icon: <MapIcon size={16} /> },
+  { title: 'Trivia Night', description: 'Grab a table at a bar that runs trivia, rally a group.', environment: 'indoor', bringsPeople: true, icon: <Sparkles size={16} /> },
+  { title: 'Dance Class', description: 'A recurring class puts you around the same new people weekly.', environment: 'indoor', bringsPeople: true, icon: <Zap size={16} /> },
+  { title: 'Volunteer Event', description: 'Group volunteering: natural conversation, low pressure.', environment: 'outdoor', bringsPeople: true, icon: <Heart size={16} /> },
+  { title: 'Coffee Shop Session', description: 'Sit somewhere public and stay approachable.', environment: 'indoor', bringsPeople: false, icon: <Coffee size={16} /> },
+];
+
+const ENV_ICON: Record<EventEnvironment, React.ReactNode> = {
+  any:     <Globe size={11} />,
+  outdoor: <Sun size={11} />,
+  indoor:  <Cloud size={11} />,
+  online:  <Wifi size={11} />,
+};
+
+const EventsScreen: React.FC<{ onOutingCompleted: (bringsPeople?: boolean) => void }> = ({ onOutingCompleted }) => {
+  const todayStr = new Date().toLocaleDateString('en-CA');
   const [events, setEvents] = useState<SocialEvent[]>(loadEvents);
+  const [viewDate, setViewDate] = useState(() => new Date());
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [environment, setEnvironment] = useState<EventEnvironment>('any');
   const [location, setLocation] = useState('');
-  const [date, setDate] = useState('');
   const [time, setTime] = useState('');
+  const [bringsPeople, setBringsPeople] = useState(false);
+
+  const eventsByDate = useMemo(() => {
+    const map: Record<string, SocialEvent[]> = {};
+    events.forEach(e => {
+      if (!map[e.date]) map[e.date] = [];
+      map[e.date].push(e);
+    });
+    Object.values(map).forEach(list => list.sort((a, b) => a.time.localeCompare(b.time)));
+    return map;
+  }, [events]);
+
+  const monthMeta = useMemo(() => {
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells: (string | null)[] = new Array(firstDay.getDay()).fill(null);
+    for (let d = 1; d <= daysInMonth; d++) {
+      cells.push(new Date(year, month, d).toLocaleDateString('en-CA'));
+    }
+    return { cells, label: firstDay.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) };
+  }, [viewDate]);
 
   const resetForm = () => {
     setTitle(''); setDescription(''); setEnvironment('any');
-    setLocation(''); setDate(''); setTime('');
+    setLocation(''); setTime(''); setBringsPeople(false);
     setShowForm(false);
   };
 
+  const openForIdea = (idea: EventIdea) => {
+    setTitle(idea.title);
+    setDescription(idea.description);
+    setEnvironment(idea.environment);
+    setBringsPeople(idea.bringsPeople);
+    setLocation('');
+    setTime('');
+    setShowForm(true);
+  };
+
   const handleCreate = () => {
-    if (!title.trim() || !date) return;
+    if (!title.trim()) return;
     const newEvent: SocialEvent = {
       id: Date.now().toString(),
       title: title.trim(),
       description: description.trim(),
       environment,
       location: location.trim(),
-      date,
+      date: selectedDate,
       time,
       createdAt: new Date().toISOString(),
+      bringsPeople,
     };
     const updated = [newEvent, ...events];
     setEvents(updated);
@@ -465,49 +537,128 @@ const EventsScreen: React.FC<{ onOutingCompleted: () => void }> = ({ onOutingCom
   };
 
   const handleComplete = (id: string) => {
+    const target = events.find(e => e.id === id);
     const updated = events.map(e => e.id === id ? { ...e, completed: true } : e);
     setEvents(updated);
     saveEvents(updated);
-    onOutingCompleted();
+    onOutingCompleted(!!target?.bringsPeople);
   };
 
-  const upcoming = events.filter(e => e.date >= new Date().toLocaleDateString('en-CA')).sort((a, b) => a.date.localeCompare(b.date));
-  const past = events.filter(e => e.date < new Date().toLocaleDateString('en-CA')).sort((a, b) => b.date.localeCompare(a.date));
+  const dayEvents = eventsByDate[selectedDate] || [];
+  const selectedLabel = new Date(selectedDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 
   return (
     <div className="space-y-4 pb-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-black text-white uppercase tracking-tight">Events</h2>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center space-x-1.5 px-3 py-1.5 bg-gold text-black text-xs font-bold rounded-xl hover:bg-gold/90 transition active:scale-95"
-        >
-          <CalendarPlus size={14} />
-          <span>New Event</span>
-        </button>
+        <GroupOutingsBadge events={events} />
       </div>
 
+      {/* Calendar */}
+      <div className="bg-dark-card border border-gold/10 rounded-3xl p-4 shadow-xl">
+        <div className="flex items-center justify-between mb-3">
+          <button onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))} className="p-1.5 rounded-lg text-white/40 hover:text-gold hover:bg-white/5 transition">
+            <ChevronLeft size={16} />
+          </button>
+          <span className="text-xs font-black uppercase tracking-widest text-gold">{monthMeta.label}</span>
+          <button onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))} className="p-1.5 rounded-lg text-white/40 hover:text-gold hover:bg-white/5 transition">
+            <ChevronRight size={16} />
+          </button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 mb-1">
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((l, i) => (
+            <span key={i} className="text-[9px] font-black text-white/30 uppercase text-center">{l}</span>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {monthMeta.cells.map((dateStr, idx) => {
+            if (!dateStr) return <div key={idx} />;
+            const dayEventList = eventsByDate[dateStr] || [];
+            const hasGroupEvent = dayEventList.some(e => e.bringsPeople);
+            const isSelected = dateStr === selectedDate;
+            const isToday = dateStr === todayStr;
+            return (
+              <button
+                key={idx}
+                onClick={() => setSelectedDate(dateStr)}
+                className={`aspect-square rounded-lg flex flex-col items-center justify-center relative transition-all text-[11px] font-bold ${
+                  isSelected ? 'bg-gold text-black' : isToday ? 'ring-2 ring-gold text-gold' : 'text-white/50 hover:bg-white/5'
+                }`}
+              >
+                <span>{Number(dateStr.slice(-2))}</span>
+                {dayEventList.length > 0 && (
+                  <span className={`absolute bottom-1 w-1 h-1 rounded-full ${hasGroupEvent ? 'bg-gold' : isSelected ? 'bg-black' : 'bg-gold/70'}`} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Selected day panel */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">{selectedLabel}</p>
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center space-x-1 px-2.5 py-1 bg-gold/10 border border-gold/30 rounded-lg text-[10px] font-black uppercase tracking-widest text-gold hover:bg-gold/20 transition"
+          >
+            <Plus size={12} />
+            <span>Add</span>
+          </button>
+        </div>
+
+        {dayEvents.length === 0 ? (
+          <div className="text-center py-8 border border-white/5 rounded-2xl">
+            <p className="text-white/25 text-xs">Nothing planned this day.</p>
+          </div>
+        ) : (
+          dayEvents.map(event => <EventCard key={event.id} event={event} onDelete={handleDelete} onComplete={handleComplete} />)
+        )}
+      </div>
+
+      {/* Find Events: curated ideas that bias toward bringing people together */}
+      <div className="space-y-2">
+        <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Find Events</p>
+        <div className="grid grid-cols-2 gap-2">
+          {EVENT_IDEAS.map((idea, idx) => (
+            <button
+              key={idx}
+              onClick={() => openForIdea(idea)}
+              className="text-left bg-dark-accent/40 border border-white/5 hover:border-gold/40 rounded-2xl p-3 space-y-1.5 transition"
+            >
+              <div className="flex items-center justify-between text-gold">
+                {idea.icon}
+                {idea.bringsPeople && <Magnet size={12} className="text-gold" />}
+              </div>
+              <p className="text-xs font-black text-white">{idea.title}</p>
+              <p className="text-[10px] text-white/40 line-clamp-2">{idea.description}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Create Event modal */}
       {showForm && (
-        <div className="bg-dark-accent/60 border border-gold/20 rounded-2xl p-4 space-y-3">
-          <h3 className="text-sm font-black text-gold uppercase tracking-wider">Create Event</h3>
+        <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="w-full max-w-sm bg-dark-card border border-gold/20 rounded-3xl p-4 space-y-3 max-h-[85vh] overflow-y-auto">
+            <h3 className="text-sm font-black text-gold uppercase tracking-wider">{selectedLabel}</h3>
 
-          <input
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="Event title"
-            className="w-full px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:border-gold focus:outline-none"
-          />
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Event title"
+              className="w-full px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:border-gold focus:outline-none"
+            />
 
-          <textarea
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder="Description (optional)"
-            rows={2}
-            className="w-full px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:border-gold focus:outline-none resize-none"
-          />
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Description (optional)"
+              rows={2}
+              className="w-full px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:border-gold focus:outline-none resize-none"
+            />
 
-          <div>
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-1.5">Environment</p>
             <div className="flex space-x-2">
               {ENV_OPTIONS.map(opt => (
                 <button
@@ -520,82 +671,64 @@ const EventsScreen: React.FC<{ onOutingCompleted: () => void }> = ({ onOutingCom
                 </button>
               ))}
             </div>
-          </div>
 
-          <input
-            value={location}
-            onChange={e => setLocation(e.target.value)}
-            placeholder="Location (optional)"
-            className="w-full px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:border-gold focus:outline-none"
-          />
-
-          <div className="flex space-x-2">
             <input
-              type="date"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              className="flex-1 px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white text-sm focus:border-gold focus:outline-none"
+              value={location}
+              onChange={e => setLocation(e.target.value)}
+              placeholder="Location (optional)"
+              className="w-full px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white placeholder-white/30 text-sm focus:border-gold focus:outline-none"
             />
+
             <input
               type="time"
               value={time}
               onChange={e => setTime(e.target.value)}
-              className="flex-1 px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white text-sm focus:border-gold focus:outline-none"
+              className="w-full px-3 py-2.5 bg-black/50 border border-white/10 rounded-xl text-white text-sm focus:border-gold focus:outline-none"
             />
-          </div>
 
-          <div className="flex space-x-2 pt-1">
-            <button onClick={resetForm} className="flex-1 py-2.5 border border-white/10 rounded-xl text-white/50 text-sm font-bold hover:border-white/20 transition">
-              Cancel
-            </button>
             <button
-              onClick={handleCreate}
-              disabled={!title.trim() || !date}
-              className="flex-1 py-2.5 bg-gold text-black text-sm font-bold rounded-xl hover:bg-gold/90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={() => setBringsPeople(b => !b)}
+              className={`w-full flex items-center space-x-3 py-3 px-4 rounded-xl border text-left transition ${bringsPeople ? 'bg-gold/20 border-gold' : 'bg-black/30 border-white/10'}`}
             >
-              Create
+              {bringsPeople ? <CheckSquare size={20} className="text-gold flex-shrink-0" /> : <Square size={20} className="text-white/30 flex-shrink-0" />}
+              <span className={`text-[11px] font-black uppercase tracking-widest ${bringsPeople ? 'text-gold' : 'text-white/40'}`}>Brings people together {bringsPeople && '🧲'}</span>
             </button>
+
+            <div className="flex space-x-2 pt-1">
+              <button onClick={resetForm} className="flex-1 py-2.5 border border-white/10 rounded-xl text-white/50 text-sm font-bold hover:border-white/20 transition">
+                Cancel
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={!title.trim()}
+                className="flex-1 py-2.5 bg-gold text-black text-sm font-bold rounded-xl hover:bg-gold/90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Create
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-
-      {upcoming.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Upcoming</p>
-          {upcoming.map(event => <EventCard key={event.id} event={event} onDelete={handleDelete} onComplete={handleComplete} />)}
-        </div>
-      )}
-
-      {past.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mt-4">Past</p>
-          {past.map(event => <EventCard key={event.id} event={event} onDelete={handleDelete} onComplete={handleComplete} past />)}
-        </div>
-      )}
-
-      {events.length === 0 && !showForm && (
-        <div className="text-center py-16 space-y-3">
-          <CalendarPlus className="w-10 h-10 text-gold/30 mx-auto" />
-          <p className="text-white/30 text-sm">No events yet.</p>
-          <p className="text-white/20 text-xs">Create one to plan your next social outing.</p>
         </div>
       )}
     </div>
   );
 };
 
-const ENV_ICON: Record<EventEnvironment, React.ReactNode> = {
-  any:     <Globe size={11} />,
-  outdoor: <Sun size={11} />,
-  indoor:  <Cloud size={11} />,
-  online:  <Wifi size={11} />,
+const GroupOutingsBadge: React.FC<{ events: SocialEvent[] }> = ({ events }) => {
+  const groupCount = events.filter(e => e.completed && e.bringsPeople).length;
+  if (groupCount === 0) return null;
+  return (
+    <span className="flex items-center space-x-1 px-2.5 py-1 bg-gold/10 border border-gold/30 rounded-full text-[10px] font-black text-gold">
+      <Magnet size={11} />
+      <span>{groupCount} Group Outings</span>
+    </span>
+  );
 };
 
-const EventCard: React.FC<{ event: SocialEvent; onDelete: (id: string) => void; onComplete: (id: string) => void; past?: boolean }> = ({ event, onDelete, onComplete, past }) => (
-  <div className={`bg-dark-accent/40 border rounded-2xl p-4 space-y-2 ${event.completed ? 'border-gold/40' : past ? 'border-white/5 opacity-60' : 'border-gold/20'}`}>
+const EventCard: React.FC<{ event: SocialEvent; onDelete: (id: string) => void; onComplete: (id: string) => void }> = ({ event, onDelete, onComplete }) => (
+  <div className={`bg-dark-accent/40 border rounded-2xl p-4 space-y-2 ${event.completed ? 'border-gold/40' : 'border-gold/20'}`}>
     <div className="flex items-start justify-between">
       <div className="flex-1 min-w-0">
-        <p className={`font-black text-sm truncate ${past && !event.completed ? 'text-white/50' : 'text-white'}`}>{event.title}</p>
+        <p className="font-black text-sm text-white truncate">{event.title}</p>
         {event.description && <p className="text-white/40 text-xs mt-0.5 line-clamp-2">{event.description}</p>}
       </div>
       <button onClick={() => onDelete(event.id)} className="ml-2 p-1 text-white/20 hover:text-red-400 transition flex-shrink-0">
@@ -608,15 +741,22 @@ const EventCard: React.FC<{ event: SocialEvent; onDelete: (id: string) => void; 
         {ENV_ICON[event.environment]}
         <span className="ml-1 capitalize">{event.environment}</span>
       </span>
-      <span className="flex items-center space-x-1 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full text-[10px] text-white/50">
-        <Calendar size={10} />
-        <span className="ml-1">{new Date(event.date + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-        {event.time && <span>· {event.time}</span>}
-      </span>
+      {event.time && (
+        <span className="flex items-center space-x-1 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full text-[10px] text-white/50">
+          <Clock size={10} />
+          <span className="ml-1">{event.time}</span>
+        </span>
+      )}
       {event.location && (
         <span className="flex items-center space-x-1 px-2 py-0.5 bg-white/5 border border-white/10 rounded-full text-[10px] text-white/50">
           <MapPin size={10} />
           <span className="ml-1">{event.location}</span>
+        </span>
+      )}
+      {event.bringsPeople && (
+        <span className="flex items-center space-x-1 px-2 py-0.5 bg-gold/10 border border-gold/30 rounded-full text-[10px] font-bold text-gold">
+          <Magnet size={10} />
+          <span className="ml-1">Brings People</span>
         </span>
       )}
     </div>
@@ -851,22 +991,24 @@ const getBoxStyles = (passes: number, isFocus?: boolean) => {
   };
 };
 
-const FrequencyMap: React.FC<{ data: { date: string, passes: number, isFocus: boolean, hasApproach: boolean, isToday?: boolean }[], columns?: number }> = ({ data, columns = 7 }) => (
+const FrequencyMap: React.FC<{ data: { date: string, passes: number, isFocus: boolean, hasApproach: boolean, isGolden?: boolean, isToday?: boolean }[], columns?: number }> = ({ data, columns = 7 }) => (
   <div className={`grid gap-2`} style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
     {data.map((day, idx) => (
-      <div 
-        key={idx} 
-        className={`aspect-square rounded-lg transition-all duration-300 flex items-center justify-center relative overflow-hidden ${day.isToday ? 'ring-2 ring-gold shadow-[0_0_20px_rgba(212,175,55,0.4)] animate-pulse-slow' : ''}`} 
-        style={getBoxStyles(day.passes, day.isFocus)}
-        title={`${day.date}: ${day.isFocus ? 'Business Focus' : day.passes + ' interactions'}`}
+      <div
+        key={idx}
+        className={`aspect-square rounded-lg transition-all duration-300 flex items-center justify-center relative overflow-hidden ${day.isToday ? 'ring-2 ring-gold shadow-[0_0_20px_rgba(212,175,55,0.4)] animate-pulse-slow' : ''} ${day.isGolden ? 'shiny-gold' : ''}`}
+        style={day.isGolden ? { background: 'linear-gradient(135deg, #F4CF67, #D4AF37, #F4CF67)', border: 'none', boxShadow: '0 0 12px rgba(244,207,103,0.7)' } : getBoxStyles(day.passes, day.isFocus)}
+        title={`${day.date}: ${day.isGolden ? 'Approached with people around' : day.isFocus ? 'Business Focus' : day.passes + ' interactions'}`}
       >
-        {day.isFocus ? (
+        {day.isGolden ? (
+          <Sparkles size={12} className="text-black" />
+        ) : day.isFocus ? (
           <Briefcase size={10} className="text-blue-100" />
         ) : (
           <>
             {(day.passes > 0 || day.hasApproach) && (
-              <span 
-                className="text-[10px] font-black tabular-nums" 
+              <span
+                className="text-[10px] font-black tabular-nums"
                 style={day.passes === 0 && day.hasApproach ? { color: '#fff' } : undefined}
               >
                 {day.passes}
@@ -900,7 +1042,7 @@ const BaseHub: React.FC<{
   const [showBreakConfirm, setShowBreakConfirm] = useState(false);
   const [selectedRating, setSelectedRating] = useState(5);
 
-  // Ignition Mode: a forced 5-second countdown the instant you spot her, so the
+  // Ignition Mode: a forced 5-second countdown the instant you spot someone, so the
   // decision gets made before the hesitation loop has time to talk you out of it.
   const [ignitionOpen, setIgnitionOpen] = useState(false);
   const [ignitionStage, setIgnitionStage] = useState<IgnitionStage>('countdown');
@@ -948,17 +1090,18 @@ const BaseHub: React.FC<{
       d.setDate(d.getDate() - i);
       const dateStr = d.toLocaleDateString('en-CA');
       const dayName = d.toLocaleDateString('en-US', { weekday: 'short' }).charAt(0);
-      days.push({ 
-        date: dateStr, 
+      days.push({
+        date: dateStr,
         passes: userState.dailyPasses[dateStr] || 0,
         isFocus: !!userState.dailyBusinessFocus[dateStr],
         hasApproach: (userState.dailyApproaches[dateStr] || 0) > 0,
+        isGolden: !!userState.dailyGoldenApproaches[dateStr],
         dayLabel: dayName,
         isToday: dateStr === todayStr
       });
     }
     return days;
-  }, [userState.dailyPasses, userState.dailyBusinessFocus, userState.dailyApproaches]);
+  }, [userState.dailyPasses, userState.dailyBusinessFocus, userState.dailyApproaches, userState.dailyGoldenApproaches]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700 pb-20">
@@ -978,7 +1121,7 @@ const BaseHub: React.FC<{
                   <span className="text-8xl font-black italic text-gold tabular-nums">{ignitionCount}</span>
                 </div>
                 <h3 className="text-2xl font-black italic uppercase text-white tracking-tighter">Move. Don't Think.</h3>
-                <p className="text-white/40 text-xs max-w-xs">Walk toward her before the countdown ends. Freezing is a choice you're about to make automatically &mdash; don't let it.</p>
+                <p className="text-white/40 text-xs max-w-xs">Walk over before the countdown ends. Freezing is a choice you're about to make automatically &mdash; don't let it.</p>
               </>
             )}
             {ignitionStage === 'result' && (
@@ -994,13 +1137,13 @@ const BaseHub: React.FC<{
             {ignitionStage === 'friends' && (
               <>
                 <h3 className="text-2xl font-black italic uppercase text-white tracking-tighter">Log The Approach</h3>
-                <p className="text-white/40 text-xs max-w-xs">Approaching with friends watching is worth bonus credit &mdash; it's harder.</p>
+                <p className="text-white/40 text-xs max-w-xs">Approaching with people around to see it is worth bonus credit &mdash; it's harder.</p>
                 <button
                   onClick={() => setIgnitionWithFriends(f => !f)}
                   className="w-full flex items-center space-x-3 py-4 px-4 rounded-2xl border border-white/10 bg-white/5 text-left"
                 >
                   {ignitionWithFriends ? <CheckSquare size={22} className="text-gold flex-shrink-0" /> : <Square size={22} className="text-white/30 flex-shrink-0" />}
-                  <span className={`text-xs font-black uppercase tracking-widest ${ignitionWithFriends ? 'text-gold' : 'text-white/50'}`}>Friends were with me {ignitionWithFriends && '🏆'}</span>
+                  <span className={`text-xs font-black uppercase tracking-widest ${ignitionWithFriends ? 'text-gold' : 'text-white/50'}`}>People were with me {ignitionWithFriends && '🏆'}</span>
                 </button>
                 <button onClick={() => finalizeIgnitionApproach(ignitionWithFriends)} className="w-full py-4 bg-gold text-black font-black uppercase tracking-widest text-xs rounded-2xl shadow-lg">
                   Confirm Log
@@ -1016,7 +1159,7 @@ const BaseHub: React.FC<{
           <div className="bg-gradient-to-br from-gold via-yellow-400 to-gold text-black px-8 py-6 rounded-3xl shadow-2xl text-center space-y-1 animate-in zoom-in-95">
             <p className="text-3xl">🏆</p>
             <p className="font-black uppercase italic tracking-tighter text-lg">Golden Approach</p>
-            <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">Bonus credit for doing it in front of friends</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">Bonus credit for doing it with people around</p>
           </div>
         </div>
       )}
@@ -1033,7 +1176,7 @@ const BaseHub: React.FC<{
                   className={`w-full flex items-center space-x-3 py-3 px-4 rounded-2xl border text-left transition ${honorWithFriends ? 'bg-gold/20 border-gold' : 'bg-black/30 border-white/10'}`}
                 >
                   {honorWithFriends ? <CheckSquare size={20} className="text-gold flex-shrink-0" /> : <Square size={20} className="text-white/30 flex-shrink-0" />}
-                  <span className={`text-[11px] font-black uppercase tracking-widest ${honorWithFriends ? 'text-gold' : 'text-white/40'}`}>Friends were with me {honorWithFriends && '🏆'}</span>
+                  <span className={`text-[11px] font-black uppercase tracking-widest ${honorWithFriends ? 'text-gold' : 'text-white/40'}`}>People were with me {honorWithFriends && '🏆'}</span>
                 </button>
                 <div className="flex flex-col w-full space-y-3 pt-2">
                    <button onClick={() => { onVerifySuccess(true, honorWithFriends); if (honorWithFriends) { setGoldenFlash(true); setTimeout(() => setGoldenFlash(false), 2500); } setShowHonorCodeConfirm(false); setHonorWithFriends(false); }} className="w-full py-4 bg-gold text-black font-black uppercase tracking-widest text-xs rounded-2xl">Confirm Log</button>
@@ -1081,13 +1224,13 @@ const BaseHub: React.FC<{
 
       <HeadlineRoller />
 
-      {/* Ignition Mode: the in-the-moment trigger for when you spot her right now */}
+      {/* Ignition Mode: the in-the-moment trigger for when you spot someone right now */}
       <button
         onClick={openIgnition}
         className="w-full py-5 rounded-3xl font-black uppercase tracking-widest text-sm bg-gradient-to-r from-gold via-yellow-400 to-gold text-black shadow-[0_0_30px_rgba(212,175,55,0.35)] flex items-center justify-center space-x-3 active:scale-[0.98] transition-transform"
       >
         <Zap size={22} className="fill-black" />
-        <span>She's Here &mdash; Ignite</span>
+        <span>They're Here &mdash; Ignite</span>
       </button>
       {(userState.stats.windowsSeized > 0 || userState.stats.windowsFrozen > 0) && (
         <p className="text-center text-[9px] font-bold uppercase tracking-widest text-gray-500 -mt-3">
@@ -1230,16 +1373,17 @@ const AchievementsDashboard: React.FC<{ userState: UserState, achievements: Achi
       d.setDate(d.getDate() - i);
       const dateStr = d.toLocaleDateString('en-CA');
       const dayName = d.toLocaleDateString('en-US', { weekday: 'short' }).charAt(0);
-      days.push({ 
-        date: dateStr, 
+      days.push({
+        date: dateStr,
         passes: userState.dailyPasses[dateStr] || 0,
         isFocus: !!userState.dailyBusinessFocus[dateStr],
         hasApproach: (userState.dailyApproaches[dateStr] || 0) > 0,
+        isGolden: !!userState.dailyGoldenApproaches[dateStr],
         dayLabel: dayName
       });
     }
     return days;
-  }, [userState.dailyPasses, userState.dailyBusinessFocus, userState.dailyApproaches]);
+  }, [userState.dailyPasses, userState.dailyBusinessFocus, userState.dailyApproaches, userState.dailyGoldenApproaches]);
 
   const monthData = useMemo(() => {
     const days = [];
@@ -1249,16 +1393,17 @@ const AchievementsDashboard: React.FC<{ userState: UserState, achievements: Achi
       d.setDate(d.getDate() - i);
       const dateStr = d.toLocaleDateString('en-CA');
       const dayName = d.toLocaleDateString('en-US', { weekday: 'short' }).charAt(0);
-      days.push({ 
-        date: dateStr, 
+      days.push({
+        date: dateStr,
         passes: userState.dailyPasses[dateStr] || 0,
         isFocus: !!userState.dailyBusinessFocus[dateStr],
         hasApproach: (userState.dailyApproaches[dateStr] || 0) > 0,
+        isGolden: !!userState.dailyGoldenApproaches[dateStr],
         dayLabel: dayName
       });
     }
     return days;
-  }, [userState.dailyPasses, userState.dailyBusinessFocus, userState.dailyApproaches]);
+  }, [userState.dailyPasses, userState.dailyBusinessFocus, userState.dailyApproaches, userState.dailyGoldenApproaches]);
 
   const monthRangeLabel = useMemo(() => {
     if (monthData.length === 0) return "";
@@ -1271,7 +1416,7 @@ const AchievementsDashboard: React.FC<{ userState: UserState, achievements: Achi
   }, [monthData]);
 
   const yearGroups = useMemo(() => {
-    const years: Record<number, { name: string, days: { date: string, passes: number, isFocus: boolean, hasApproach: boolean }[] }[]> = {};
+    const years: Record<number, { name: string, days: { date: string, passes: number, isFocus: boolean, hasApproach: boolean, isGolden: boolean }[] }[]> = {};
     const merged = Array.from(new Set([...Object.keys(userState.dailyPasses), ...Object.keys(userState.dailyBusinessFocus), ...Object.keys(userState.dailyApproaches)]));
     const startYear = merged.length > 0 ? Math.min(...merged.map(d => new Date(d).getFullYear())) : new Date().getFullYear();
     const endYear = new Date().getFullYear();
@@ -1284,11 +1429,12 @@ const AchievementsDashboard: React.FC<{ userState: UserState, achievements: Achi
         const monthName = d.toLocaleDateString('en-US', { month: 'short' });
         while (d.getMonth() === m) {
           const dateStr = d.toLocaleDateString('en-CA');
-          monthDays.push({ 
-            date: dateStr, 
+          monthDays.push({
+            date: dateStr,
             passes: userState.dailyPasses[dateStr] || 0,
             isFocus: !!userState.dailyBusinessFocus[dateStr],
-            hasApproach: (userState.dailyApproaches[dateStr] || 0) > 0
+            hasApproach: (userState.dailyApproaches[dateStr] || 0) > 0,
+            isGolden: !!userState.dailyGoldenApproaches[dateStr]
           });
           d.setDate(d.getDate() + 1);
         }
@@ -1297,7 +1443,7 @@ const AchievementsDashboard: React.FC<{ userState: UserState, achievements: Achi
       years[y] = months;
     }
     return years;
-  }, [userState.dailyPasses, userState.dailyBusinessFocus, userState.dailyApproaches]);
+  }, [userState.dailyPasses, userState.dailyBusinessFocus, userState.dailyApproaches, userState.dailyGoldenApproaches]);
 
   const yearsAvailable = useMemo(() => Object.keys(yearGroups).map(Number).sort((a, b) => b - a), [yearGroups]);
 
@@ -1415,14 +1561,19 @@ const YearHeatmap: React.FC<{ months: { name: string, days: any[] }[] }> = ({ mo
         <span className="text-[9px] font-black text-gold/50 uppercase tracking-[0.2em] block text-center border-b border-white/5 pb-1">{m.name}</span>
         <div className="grid grid-cols-7 gap-0.5">
           {m.days.map((d, dIdx) => (
-             <div 
-              key={dIdx} 
-              className="aspect-square rounded-[2px] relative overflow-hidden" 
-              style={{
-                backgroundColor: d.isFocus ? 'rgba(59, 130, 246, 0.4)' : d.passes > 0 ? `hsl(45, 80%, ${Math.max(25, 80 - (Math.min(10, d.passes) * 5))}%)` : 'rgba(255,255,255,0.03)'
-              }}
+             <div
+              key={dIdx}
+              className={`aspect-square rounded-[2px] relative overflow-hidden ${d.isGolden ? 'shiny-gold' : ''}`}
+              style={d.isGolden
+                ? { background: 'linear-gradient(135deg, #F4CF67, #D4AF37, #F4CF67)', boxShadow: '0 0 4px rgba(244,207,103,0.8)' }
+                : { backgroundColor: d.isFocus ? 'rgba(59, 130, 246, 0.4)' : d.passes > 0 ? `hsl(45, 80%, ${Math.max(25, 80 - (Math.min(10, d.passes) * 5))}%)` : 'rgba(255,255,255,0.03)' }
+              }
             >
-              {d.hasApproach && <div className="absolute inset-0 flex items-center justify-center"><Check size={4} className="text-black/40" /></div>}
+              {d.isGolden ? (
+                <div className="absolute inset-0 flex items-center justify-center"><Sparkles size={4} className="text-black/60" /></div>
+              ) : d.hasApproach && (
+                <div className="absolute inset-0 flex items-center justify-center"><Check size={4} className="text-black/40" /></div>
+              )}
             </div>
           ))}
         </div>

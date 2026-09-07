@@ -28,6 +28,7 @@ export interface UserStats {
   windowsFrozen: number;
   plannedOutingsCompleted: number;
   approachesWithFriends: number;
+  groupOutingsCompleted: number;
 }
 
 export interface Location {
@@ -43,6 +44,7 @@ export interface UserState {
   dailyPasses: Record<string, number>;
   dailyApproaches: Record<string, number>;
   dailyBusinessFocus: Record<string, boolean>;
+  dailyGoldenApproaches: Record<string, boolean>;
   stats: UserStats;
   achievements: Achievement[];
   homeLocation: Location | null;
@@ -72,6 +74,7 @@ export interface SocialEvent {
   time: string;
   createdAt: string;
   completed?: boolean;
+  bringsPeople?: boolean;
 }
 
 export interface DateMilestones {

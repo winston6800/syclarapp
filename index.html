@@ -50,6 +50,11 @@
       .custom-scrollbar::-webkit-scrollbar { width: 4px; }
       .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
       .custom-scrollbar::-webkit-scrollbar-thumb { background: #D4AF37; border-radius: 10px; }
+      .shiny-gold { background-size: 200% 200%; animation: shiny-shift 2.2s ease-in-out infinite; }
+      @keyframes shiny-shift {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+      }
     </style>
   </head>
   <body class="bg-gradient-gold min-h-screen">
